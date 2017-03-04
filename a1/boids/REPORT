@@ -1,0 +1,81 @@
+CSC 418 - Assignment 1 Report File
+
+In this file you must:
+
+__________________________________________________________________
+1) Describe *briefly* and *concisely* what parts of the assignment
+   you found easier, harder, and/or tricky to get right
+
+	Boid update (rule0-3) is easy to implement.
+	Animation (shape update of a boid) is harder. Need to pay extra attention
+	to the sequence of transformations. 
+	Choosing nice colors also requirs a lot of experiments, which is time-comsuming.
+
+
+__________________________________________________________________
+2) Answer any //QUESTION: items noted in the code
+
+ QUESTION:
+  Is this the optimal way to implement this
+ rule? can you see any problems or ways
+ to improve this bit? (rule0)
+
+	Different boid should have different weights according to its distance
+	from the current boid, different sizes and roles (leaders).
+	If there is predator, its mass should not be considered.
+
+ QUESTION: Why add inertia at the end and
+  not at the beginning?
+
+	Inertia should not contain any components from velocity1-3 (from rule1-3).
+
+
+
+__________________________________________________________________
+3) Describe any //CRUNCHY: extensions you implemented
+
+* Single Boid animation (jellyfish squishing).
+* Add leaders. Nearby boids tend to move toward these leaders.
+* Add trails to every boid to show its last few positions.
+* Mouse click on screen in either z or x direction (rotate view to change the direction)
+  to disturb the boids at this positon.
+
+
+__________________________________________________________________
+
+4) Briefly comment on the following:
+
+a) What is the time complexity of the boid update (in big Oh notation),
+   justify.
+	O(n^2)
+	For each boid ----- O(n)
+		check on every other boid velocity and location ----- O(n)
+
+	Total: O(n*n*constant) = O(n^2)
+
+b) What could you do to make the update more efficient?
+
+	Combine all 3 rules (1-3) into one for-loop, it can reduce the constant in big-Oh.
+
+c) What is the greatest bottleneck of the program:
+
+    Is it the boid update code?
+    Or is it the boid display code?
+
+	the boid display code
+
+    Why is that? justify your answer.
+
+	Hard to do sophisticated shape of boid and make the boid look nicer.
+	Because it requires a lot of experiments of coloring and combining different
+	polygons to find a nice-looking combination. It also requires math, like poler curves
+	and linear algebra.
+
+d) How would you adapt the idea behind Boids to swarms of running
+   creatures (e.g. a herd of charging animals, an army of CGI
+   monsters, a crowd of simulated humans walking). Think of the
+   specific conditions you would need to add to the simulation
+   that are different from your Boids implementation
+
+	Constrain the 3rd coordinate (y) to be 0. So all boids stay in a plane. 
+	Rule 0-3 still apply.

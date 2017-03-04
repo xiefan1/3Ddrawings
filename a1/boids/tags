@@ -1,0 +1,34 @@
+Boid_Color	Boids.cpp	102
+Boid_Location	Boids.cpp	100
+Boid_Velocity	Boids.cpp	101
+GL_Settings_Init	Boids.cpp	/^void GL_Settings_Init()$/
+HSV2RGB	Boids.cpp	/^void HSV2RGB(float H, float S, float V, float *R, /
+MBoids.cpp	Boids.cpp	/^int main(int argc, char** argv)$/
+Mtest.cpp	test.cpp	/^int main(int argc, char** argv){$/
+Win	Boids.cpp	109
+WindowDisplay	Boids.cpp	/^void WindowDisplay(void)$/
+WindowReshape	Boids.cpp	/^void WindowReshape(int w, int h)$/
+avg_vec	Boids.cpp	571
+continue	Boids.cpp	576
+drawBoid	Boids.cpp	/^void drawBoid(int i)$/
+global_rot	Boids.cpp	118
+glui	Boids.cpp	108
+initGlui	Boids.cpp	/^void initGlui()$/
+initGlut	Boids.cpp	/^void initGlut(char* winName)$/
+j	Boids.cpp	572
+k_rule0	Boids.cpp	116
+k_rule1	Boids.cpp	113
+k_rule2	Boids.cpp	114
+k_rule3	Boids.cpp	115
+modelVertices	Boids.cpp	103
+nBoids	Boids.cpp	99
+n_vertices	Boids.cpp	104
+quitButton	Boids.cpp	/^void quitButton(int)$/
+r_rule1	Boids.cpp	110
+r_rule2	Boids.cpp	111
+r_rule3	Boids.cpp	112
+read3ds	Boids.cpp	/^float *read3ds(const char *name, int *n)$/
+shapeness	Boids.cpp	117
+updateBoid	Boids.cpp	/^void updateBoid(int i)$/
+vector_to_massCenter	speed.cpp	/^Point3D& vector_to_massCenter(int k, Point3D& vec3/
+windowID	Boids.cpp	107
