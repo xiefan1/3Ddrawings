@@ -487,6 +487,10 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
     dim = pow(dim,obj->shinyness);
     add_col(rs*lr*dim,rs*lg*dim,rs*lb*dim,col);
 
+    if(col->R>1) col->R=1;
+    if(col->G>1) col->G=1;
+    if(col->B>1) col->B=1;
+
     cur=cur->next;
  }
 }
