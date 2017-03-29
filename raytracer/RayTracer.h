@@ -73,6 +73,18 @@ struct colourRGB{
 	double B;
 };
 
+inline void set_col(double r,double g, double b, struct colourRGB* col){
+	col->R=r;
+	col->G=g;
+	col->B=b;
+}
+
+inline void add_col(double r,double g, double b, struct colourRGB* col){
+	col->R+=r;
+	col->G+=g;
+	col->B+=b;
+}
+
 /*
    The structure below defines an Object within the World Coordinate Frame.
    For this ray tracer, we will use a simple linked list of objects (not

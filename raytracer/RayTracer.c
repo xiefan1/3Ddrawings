@@ -264,11 +264,11 @@ int main(int argc, char *argv[])
  origin.py=0;
  origin.pz=0;
  origin.pw=1;
- //pixel coordinate
+ //direction vector: pixel coordinate-origin
  ps.px=cam->wl;
  ps.py=cam->wt;
  ps.pz=cam->f;
- ps.pw=1;
+ ps.pw=0;
 
  for (j=0;j<sx;j++)		// For each of the pixels in the image
  {
@@ -280,9 +280,10 @@ int main(int argc, char *argv[])
     matRayMult(cam->C2W,ray);
 
     struct colourRGB col={0,0,0};
-    rayTrace(ray,MAX_DEPTH,&col,NULL);
+    rayTrace(ray,0,&col,NULL);
 
     //set color of this pixel
+    //printf("(%f, %f, %f)",col.R,col.G,col.B);
     *(rgbIm+j*sx*3+i*3+0) = col.R*255;
     *(rgbIm+j*sx*3+i*3+1) = col.G*255;
     *(rgbIm+j*sx*3+i*3+2) = col.B*255;
@@ -293,7 +294,7 @@ int main(int argc, char *argv[])
     //next pixel
     ps.px+=du;
   } // end of this row
-
+  //printf("\n");
   ps.px=cam->wl; //reset the u corrd.
   ps.py+=dv; //note: dv is negative
  } // end for j
@@ -311,55 +312,6 @@ int main(int argc, char *argv[])
 }
 
 
-
-void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct ray3D *ray, int depth, double a, double b, struct colourRGB *col)
-{
- // This function implements the shading model as described in lecture. It takes
- // - A pointer to the first object intersected by the ray (to get the colour properties)
- // - The coordinates of the intersection point (in world coordinates)
- // - The normal at the point
- // - The ray (needed to determine the reflection direction to use for the global component, as well as for
- //   the Phong specular component)
- // - The current racursion depth
- // - The (a,b) texture coordinates (meaningless unless texture is enabled)
- //
- // Returns:
- // - The colour for this ray (using the col pointer)
- //
-
- struct colourRGB tmp_col;	// Accumulator for colour components
- double R,G,B;			// Colour for the object in R G and B
-
- // This will hold the colour as we process all the components of
- // the Phong illumination model
- tmp_col.R=0;
- tmp_col.G=0;
- tmp_col.B=0;
-
- if (obj->texImg==NULL)		// Not textured, use object colour
- {
-  R=obj->col.R;
-  G=obj->col.G;
-  B=obj->col.B;
- }
- else
- {
-  // Get object colour from the texture given the texture coordinates (a,b), and the texturing function
-  // for the object. Note that we will use textures also for Photon Mapping.
-  obj->textureMap(obj->texImg,a,b,&R,&G,&B);
- }
-
- //////////////////////////////////////////////////////////////
- // TO DO: Implement this function. Refer to the notes for
- // details about the shading model.
- //////////////////////////////////////////////////////////////
-
- // Be sure to update 'col' with the final colour computed here!
- return;
-
-}
-
-
 // Find the closest intersection between the ray and any objects in the scene.
 // It returns:
 //   - The lambda at the intersection (or < 0 if no intersection)
@@ -373,7 +325,7 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
 void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
 		  	struct object3D **obj, struct point3D *p, 
 			struct point3D *n, double *a, double *b){
-    *lambda = 0;
+    *lambda = -1;
     *obj = NULL;
     struct object3D *cur_obj=object_list;
     while(cur_obj!=NULL){
@@ -382,7 +334,7 @@ void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
 
 	//Q1:should it compare with 1 instead??
 	if(temp>0){
-    	    if(*lambda==0 || *lambda>temp)
+    	    if(*lambda==-1 || *lambda>temp)
     	    {
 		*lambda = temp;
 		*obj = cur_obj;
@@ -392,6 +344,7 @@ void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
 		double Tinv_trans[4][4]={0};
 		transpose(&(cur_obj->Tinv[0][0]),&(Tinv_trans[0][0]));
 		matVecMult(Tinv_trans,n);
+		normalize(n);
 
 		// transform the intersect point p
 		matVecMult(cur_obj->T,p);
@@ -434,18 +387,8 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
 	//color shading
         if(hitObj){
             //if hit an object
-            //To Do: shawdow
-            //create ray from hitObj to light sources
-
 	    //Phong illumination
-	    //phongshader();
-
-	    //for now
-	    col->R=hitObj->col.R;
-	    col->G=hitObj->col.G;
-	    col->B=hitObj->col.B;
-
-	}
+	    rtShade(hitObj,&p,&n,ray,depth,a,b,col);
 
 /*	if(depth>0){
 	    //generate reflection ray
@@ -453,6 +396,99 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
 	    rayTrace(reflect, depth--,col,hitObj);
 	}
 	*/
+	}
+}
+
+
+// This function implements the shading model as described in lecture. It takes
+// - A pointer to the first object intersected by the ray (to get the colour properties)
+// - The coordinates of the intersection point (in world coordinates)
+// - The normal at the point
+// - The ray (needed to determine the reflection direction to use for the global component, as well as for
+//   the Phong specular component)
+// - The current racursion depth
+// - The (a,b) texture coordinates (meaningless unless texture is enabled)
+//
+// Returns:
+// - The colour for this ray (using the col pointer)
+void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct ray3D *ray, int depth, double a, double b, struct colourRGB *col)
+{
+ double R,G,B;			// Colour for the object in R G and B
+
+ if (obj->texImg==NULL)		// Not textured, use object colour
+ {
+  R=obj->col.R;
+  G=obj->col.G;
+  B=obj->col.B;
+ }
+ else
+ {
+  // Get object colour from the texture given the texture coordinates (a,b), and the texturing function
+  // for the object. Note that we will use textures also for Photon Mapping.
+  obj->textureMap(obj->texImg,a,b,&R,&G,&B);
+ }
+
+ double ra,rd,rs,rg;
+ ra=obj->alb.ra;
+ rd=obj->alb.rd;
+ rs=obj->alb.rs;
+ rg=obj->alb.rg;
+
+ //for all the light sources
+ struct pointLS *cur;
+ cur=light_list;
+ while(cur!=NULL){
+    double lr,lg,lb;
+    lr=cur->col.R;
+    lg=cur->col.G;
+    lb=cur->col.B;
+
+    //To Do: shawdow
+    //create ray from hitObj to light sources
+
+
+    /* ambient */
+    add_col(ra*R,ra*G,ra*B,col);
+
+
+    /* diffuse */
+    struct point3D s; //the p->light source vector
+    copyPoint(&(cur->p0),&s);
+    subVectors(p,&s);
+    s.pw=0;
+    normalize(&s);
+    double dim = dot(n,&s);
+    if(dim<0){
+    	if(obj->frontAndBack) dim=-dim;
+	else dim=0;
+    }
+    add_col(rd*lr*R*dim,rd*lg*G*dim,rd*lb*B*dim,col);
+
+
+    /* specular */
+    struct point3D r; //the reflection vector
+    copyPoint(n,&r);
+    double up=2*dot(n,&s);
+    multVector(up,&r);
+    subVectors(&s,&r);
+    r.pw=0;
+
+    struct point3D b; //the p->object source vector
+    copyPoint(&(ray->d),&b);
+    normalize(&b);
+    multVector(-1,&b);
+    b.pw=0;
+
+    dim = dot(&b,&r);
+    if(dim<0){
+    	if(obj->frontAndBack) dim=-dim;
+	else dim=0;
+    }
+    dim = pow(dim,obj->shinyness);
+    add_col(rs*lr*dim,rs*lg*dim,rs*lb*dim,col);
+
+    cur=cur->next;
+ }
 }
 
 

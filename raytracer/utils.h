@@ -133,6 +133,16 @@ inline void subVectors(struct point3D *a, struct point3D *b)
  b->pw=1;               // Mind the homogeneous coordinate!
 }
 
+inline void multVector(double a, struct point3D *b){
+ // Performs b=a*b. Note the result
+ // is left in b. This function assumes the w components
+ // of both vectors are set to 1.
+ b->px=b->px*a;
+ b->py=b->py*a;
+ b->pz=b->pz*a;
+ b->pw=1;               // Mind the homogeneous coordinate!
+}
+
 inline double length(struct point3D *a)
 {
  // Compute and return the length of a vector

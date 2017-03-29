@@ -123,7 +123,6 @@ struct object3D *newSphere(double ra, double rd, double rs, double rg, double r,
  // shiny -Exponent for the specular component of the Phong model
  //
  // This is assumed to represent a unit sphere centered at the origin.
- //
 
  struct object3D *sphere=(struct object3D *)calloc(1,sizeof(struct object3D));
 
@@ -183,25 +182,64 @@ void planeIntersect(struct object3D *plane, struct ray3D *ray, double *lambda,
     y = p->py+t*d->py;
 
     //check the boundaries
-    if(x>=-1 && x<=1 && y>=-1 && y<=-1){
+    if(x>=-1 && x<=1 && y>=-1 && y<=1){
 	//assign vectors in the model world
 	*lambda=t;
 	ray->rayPos(ray, t, _p);
 	_n->px=0;
 	_n->py=0;
 	_n->pz=1;
+	_n->pw=0;
     }
     //convert back the ray into the object world
     matRayMult(plane->T,ray);
 }
 
-void sphereIntersect(struct object3D *sphere, struct ray3D *ray, double *lambda, struct point3D *p, struct point3D *n, double *a, double *b)
+void sphereIntersect(struct object3D *sphere, struct ray3D *ray, double *lambda, struct point3D *_p,
+					struct point3D *_n, double *a, double *b)
 {
     //transform the ray into Model world
     matRayMult(sphere->Tinv,ray);
 
+    double A,B,C;
+    double px,py,pz,dx,dy,dz;
+    *lambda=-1;
+    px=ray->p0.px;
+    py=ray->p0.py;
+    pz=ray->p0.pz;
+    dx=ray->d.px;
+    dy=ray->d.py;
+    dz=ray->d.pz;
+ 
+    A = dx*dx+dy*dy+dz*dz;
+    B = (px*dx+py*dy+pz*dz)*2;
+    C = px*px+py*py+pz*pz-1;
+    double delta = B*B-4*A*C,t;
+    if(A>0 && delta>=0){
+    	if(delta==0){
+	    //there is one root
+	    t = -B/(2*A);
+	}else{
+	    //2 roots
+	    double t1,t2;
+	    delta = sqrt(delta);
+	    t1 = (-B-delta)/A;
+	    t2 = (-B+delta)/A;
+	    if(t1>0) t=t1/2;
+	    else t=t2/2;
+	}
+	if(t>0){
+	    *lambda=t;
+	    ray->rayPos(ray, t, _p);
+	    _n->px=_p->px;
+	    _n->py=_p->py;
+	    _n->pz=_p->pz;
+	    _n->pw=0;
+	}
+    }
 
-
+    //convert back the ray into the object world
+    matRayMult(sphere->T,ray);
 
 }
 
