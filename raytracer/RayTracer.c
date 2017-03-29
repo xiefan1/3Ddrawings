@@ -81,14 +81,14 @@ void buildScene(void)
  insertObject(o,&object_list);			// Insert into object list
 
  // Let's add a couple spheres
- o=newSphere(.05,.95,.35,.35,1,.25,.25,1,1,6);
+ o=newSphere(.05,.95,.35,.35,1,.25,.25,1,1,10);
  Scale(o,.75,.5,1.5);
  RotateY(o,PI/2);
  Translate(o,-1.45,1.1,3.5);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
- o=newSphere(.05,.95,.95,.75,.75,.95,.55,1,1,6);
+ o=newSphere(.05,.95,.95,.75,.75,.95,.55,1,1,10);
  Scale(o,.5,2.0,1.0);
  RotateZ(o,PI/1.5);
  Translate(o,1.75,1.25,5.0);
@@ -327,15 +327,24 @@ void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
 			struct point3D *n, double *a, double *b){
     *lambda = -1;
     *obj = NULL;
+    int initial=1;
     struct object3D *cur_obj=object_list;
     while(cur_obj!=NULL){
+	//make one object can not intersect with itself
+	//to avoid errors caused by rounding precision errors etc.
+	if(cur_obj == Os){
+	    cur_obj=cur_obj->next;
+	    continue;
+	}
+
 	double temp=0; //temporary lambda
 	cur_obj->intersect(cur_obj,ray,&temp,p,n,a,b);
 
 	//Q1:should it compare with 1 instead??
 	if(temp>0){
-    	    if(*lambda==-1 || *lambda>temp)
+    	    if(initial==1 || *lambda>temp)
     	    {
+		initial = 0;
 		*lambda = temp;
 		*obj = cur_obj;
 
@@ -443,20 +452,39 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
     lg=cur->col.G;
     lb=cur->col.B;
 
-    //To Do: shawdow
-    //create ray from hitObj to light sources
-
-
     /* ambient */
+
     add_col(ra*R,ra*G,ra*B,col);
 
-
-    /* diffuse */
-    struct point3D s; //the p->light source vector
+    //the p->light vector
+    struct point3D s; 
     copyPoint(&(cur->p0),&s);
     subVectors(p,&s);
     s.pw=0;
+
+    /* shadow */
+
+    //create ray from hitObj to light sources
+    struct ray3D *ray_to_light = newRay(p,&s);//note s is not normalized
+    double shadow_t=0;
+    struct object3D* hitObj=NULL;
+    struct point3D _p,_n;
+    findFirstHit(ray_to_light,&shadow_t,obj,&hitObj,&_p,&_n,NULL,NULL);
+    free(ray_to_light);
+    ray_to_light=NULL;
+    //if any object blocks the light,
+    //exclude diffuse and specular components
+    if(hitObj!=NULL && shadow_t<1 && shadow_t>0){
+	cur=cur->next;
+	continue;
+    }
+
+
+    /* diffuse */
+
+    //normalize the p->light vector
     normalize(&s);
+
     double dim = dot(n,&s);
     if(dim<0){
     	if(obj->frontAndBack) dim=-dim;
