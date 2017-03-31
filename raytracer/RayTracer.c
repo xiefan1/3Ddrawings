@@ -66,12 +66,12 @@ void buildScene(void)
 
  // Let's add a plane
  // Note the parameters: ra, rd, rs, rg, R, G, B, alpha, r_index, and shinyness)
- o=newPlane(.05,.75,.05,.05,.55,.8,.75,1,1,2);	// Note the plane is highly-reflective (rs=rg=.75) so we
+ o=newPlane(.05,.75,.05,1,.55,.8,.75,1,1,2);	// Note the plane is highly-reflective (rs=rg=.75) so we
 						// should see some reflections if all is done properly.
 						// Colour is close to cyan, and currently the plane is
 						// completely opaque (alpha=1). The refraction index is
 						// meaningless since alpha=1
- Scale(o,6,6,1);				// Do a few transforms...
+ Scale(o,16,16,1);				// Do a few transforms...
  RotateZ(o,PI/1.20);
  RotateX(o,PI/2.25);
  Translate(o,0,-3,10);
@@ -88,7 +88,7 @@ void buildScene(void)
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
- o=newSphere(.05,.95,.95,.75,.75,.95,.55,1,1,10);
+ o=newSphere(.05,.95,.95,1,.75,.95,.55,1,1,10);
  Scale(o,.5,2.0,1.0);
  RotateZ(o,PI/1.5);
  Translate(o,1.75,1.25,5.0);
@@ -196,28 +196,29 @@ int main(int argc, char *argv[])
  // Camera center is at (0,0,-1)
  e.px=0;
  e.py=0;
- e.pz=-3;
+ e.pz=-6;
  e.pw=1;
 
  // To define the gaze vector, we choose a point 'pc' in the scene that
  // the camera is looking at, and do the vector subtraction pc-e.
  // Here we set up the camera to be looking at the origin, so g=(0,0,0)-(0,0,-1)
  g.px=0;
- g.py=0;
+ g.py=-0.1;
  g.pz=1;
- g.pw=1;
+ g.pw=0;
+ normalize(&g);
 
  // Define the 'up' vector to be the Y axis
  up.px=0;
  up.py=1;
  up.pz=0;
- up.pw=1;
+ up.pw=0;
 
  // Set up view with given the above vectors, a 4x4 window. Fan: size 4 is in distance units, not pixels
  // and a focal length of -1 (why? where is the image plane?)
  // Note that the top-left corner of the window is at (-2, 2)
  // in camera coordinates.
- cam=setupView(&e, &g, &up, -3, -2, 2, 4);
+ cam=setupView(&e, &g, &up, -2, -2, 2, 4);
 
  if (cam==NULL)
  {
@@ -231,17 +232,6 @@ int main(int argc, char *argv[])
  background.R=0;
  background.G=0;
  background.B=0;
-
- // Do the raytracing
- //////////////////////////////////////////////////////
- // TO DO: You will need code here to do the raytracing
- //        for each pixel in the image. Refer to the
- //        lecture notes, in particular, to the
- //        raytracing pseudocode, for details on what
- //        to do here. Make sure you undersand the
- //        overall procedure of raytracing for a single
- //        pixel.
- //////////////////////////////////////////////////////
  du=cam->wsize/(sx-1);		// du and dv. In the notes in terms of wl and wr, wt and wb,
  dv=-cam->wsize/(sx-1);		// here we use wl, wt, and wsize. du=dv since the image is
 				// and dv is negative since y increases downward in pixel
@@ -324,7 +314,7 @@ int main(int argc, char *argv[])
 // note: ray is in the world coords
 void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
 		  	struct object3D **obj, struct point3D *p, 
-			struct point3D *n, double *a, double *b){
+			struct point3D *n, double *a, double *b, int depth){
     *lambda = -1;
     *obj = NULL;
     int initial=1;
@@ -379,32 +369,22 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
 			struct object3D *Os)
 {
 	assert(ray);
-	if (depth>MAX_DEPTH){	// Max recursion depth reached. Return invalid colour.
-	    col->R=-1;
-	    col->G=-1;
-	    col->B=-1;
+	if (depth>MAX_DEPTH)	// Max recursion depth reached
 	    return;
-	}
 
 	double lambda=0, a=0,b=0; //a,b are texture coords
     	struct object3D* hitObj=NULL;
         struct point3D p,n;
         //find the first intersection
         //return lambda, hit object(next object source), hit point and normal
-        findFirstHit(ray,&lambda,Os,&hitObj,&p,&n,&a,&b);
+        findFirstHit(ray,&lambda,Os,&hitObj,&p,&n,&a,&b,depth);
 
 	//color shading
         if(hitObj){
             //if hit an object
 	    //Phong illumination
 	    rtShade(hitObj,&p,&n,ray,depth,a,b,col);
-
-/*	if(depth>0){
-	    //generate reflection ray
-	    struct ray3D *reflect = gen_reflect();
-	    rayTrace(reflect, depth--,col,hitObj);
-	}
-	*/
+	    //if(hitObj->frontAndBack==1) printf("plane normal (%f,%f,%f)\n",n.px,n.py,n.pz);
 	}
 }
 
@@ -420,7 +400,8 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
 //
 // Returns:
 // - The colour for this ray (using the col pointer)
-void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct ray3D *ray, int depth, double a, double b, struct colourRGB *col)
+void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct ray3D *ray,
+				int depth, double _a, double _b, struct colourRGB *col)
 {
  double R,G,B;			// Colour for the object in R G and B
 
@@ -434,7 +415,7 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
  {
   // Get object colour from the texture given the texture coordinates (a,b), and the texturing function
   // for the object. Note that we will use textures also for Photon Mapping.
-  obj->textureMap(obj->texImg,a,b,&R,&G,&B);
+  obj->textureMap(obj->texImg,_a,_b,&R,&G,&B);
  }
 
  double ra,rd,rs,rg;
@@ -442,6 +423,13 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
  rd=obj->alb.rd;
  rs=obj->alb.rs;
  rg=obj->alb.rg;
+
+ //compute the unit p->OS vector
+ struct point3D b;
+ copyPoint(&(ray->d),&b);
+ normalize(&b);
+ multVector(-1,&b);
+ b.pw=0;
 
  //for all the light sources
  struct pointLS *cur;
@@ -451,76 +439,97 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
     lr=cur->col.R;
     lg=cur->col.G;
     lb=cur->col.B;
-
-    /* ambient */
-
-    add_col(ra*R,ra*G,ra*B,col);
-
-    //the p->light vector
-    struct point3D s; 
+ 
+    //compute the p->light vector
+    struct point3D s; //the p->light vector
     copyPoint(&(cur->p0),&s);
     subVectors(p,&s);
     s.pw=0;
+    //compute the unit reflection vector
+    struct point3D r;
+    copyPoint(n,&r);
+    double up=2*dot(n,&s);
+    multVector(up,&r);
+    subVectors(&s,&r);
+    normalize(&r);
+    r.pw=0;
+
+
+    /* ambient */
+    add_col(ra*lr*R,ra*lg*G,ra*lb*B,col);
 
     /* shadow */
-
     //create ray from hitObj to light sources
     struct ray3D *ray_to_light = newRay(p,&s);//note s is not normalized
     double shadow_t=0;
     struct object3D* hitObj=NULL;
     struct point3D _p,_n;
-    findFirstHit(ray_to_light,&shadow_t,obj,&hitObj,&_p,&_n,NULL,NULL);
+    findFirstHit(ray_to_light,&shadow_t,obj,&hitObj,&_p,&_n,NULL,NULL,depth);
     free(ray_to_light);
     ray_to_light=NULL;
-    //if any object blocks the light,
-    //exclude diffuse and specular components
-    if(hitObj!=NULL && shadow_t<1 && shadow_t>0){
-	cur=cur->next;
-	continue;
-    }
-
-
-    /* diffuse */
-
+	
     //normalize the p->light vector
     normalize(&s);
+    
 
-    double dim = dot(n,&s);
-    if(dim<0){
-    	if(obj->frontAndBack) dim=-dim;
-	else dim=0;
+    //if any object blocks the light,
+    //exclude diffuse and specular components
+    if(hitObj == NULL || shadow_t>=1 || shadow_t <=0){
+        /* diffuse */
+        double dim = dot(n,&s);
+        if(dim<0){
+        	if(obj->frontAndBack) dim=-dim;
+    	else dim=0;
+        }
+        add_col(rd*lr*R*dim,rd*lg*G*dim,rd*lb*B*dim,col);
+    
+    
+        /* specular */
+        dim = dot(&b,&r);
+        if(dim<0){
+        	if(obj->frontAndBack) dim=-dim;
+    	else dim=0;
+        }
+        dim = pow(dim,obj->shinyness);
+        add_col(rs*lr*dim,rs*lg*dim,rs*lb*dim,col);
+
     }
-    add_col(rd*lr*R*dim,rd*lg*G*dim,rd*lb*B*dim,col);
+    //end of shadow
+
+     cur=cur->next;
+ }
+
+ if(col->R>1) col->R=1;
+ if(col->G>1) col->G=1;
+ if(col->B>1) col->B=1;
+ if(col->R==1 && col->G==1 && col->B==1) return;
 
 
-    /* specular */
-    struct point3D r; //the reflection vector
+ /* reflection */
+ if(depth<MAX_DEPTH){
+    //shoot the reflection ray
+    struct point3D r;
     copyPoint(n,&r);
-    double up=2*dot(n,&s);
+    double up=2*dot(n,&b);
     multVector(up,&r);
-    subVectors(&s,&r);
+    subVectors(&b,&r);
+    normalize(&r);
     r.pw=0;
 
-    struct point3D b; //the p->object source vector
-    copyPoint(&(ray->d),&b);
-    normalize(&b);
-    multVector(-1,&b);
-    b.pw=0;
+    struct colourRGB col_ref={0,0,0};
+    struct ray3D* rRay = newRay(p,&r); //r is normalized
+    rayTrace(rRay,depth+1,&col_ref,obj);
+    free(rRay);
+    rRay=NULL;
+    col_ref.R*=rg*R;
+    col_ref.G*=rg*G;
+    col_ref.B*=rg*B;
+    add_col(&col_ref,col);
 
-    dim = dot(&b,&r);
-    if(dim<0){
-    	if(obj->frontAndBack) dim=-dim;
-	else dim=0;
-    }
-    dim = pow(dim,obj->shinyness);
-    add_col(rs*lr*dim,rs*lg*dim,rs*lb*dim,col);
-
-    if(col->R>1) col->R=1;
-    if(col->G>1) col->G=1;
-    if(col->B>1) col->B=1;
-
-    cur=cur->next;
  }
+ if(col->R>1) col->R=1;
+ if(col->G>1) col->G=1;
+ if(col->B>1) col->B=1;
 }
 
 

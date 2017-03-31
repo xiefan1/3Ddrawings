@@ -188,7 +188,8 @@ void planeIntersect(struct object3D *plane, struct ray3D *ray, double *lambda,
 	ray->rayPos(ray, t, _p);
 	_n->px=0;
 	_n->py=0;
-	_n->pz=1;
+	if(ray->d.pz>0) _n->pz=-1;
+	else _n->pz=1;
 	_n->pw=0;
     }
     //convert back the ray into the object world
@@ -572,7 +573,7 @@ struct view *setupView(struct point3D *e, struct point3D *g, struct point3D *up,
  c->w.px=-g->px;
  c->w.py=-g->py;
  c->w.pz=-g->pz;
- c->w.pw=1;
+ c->w.pw=0;
  normalize(&c->w);
 
  // Set up the horizontal direction, which must be perpenticular to w and up
@@ -581,7 +582,7 @@ struct view *setupView(struct point3D *e, struct point3D *g, struct point3D *up,
  c->u.px=u->px;
  c->u.py=u->py;
  c->u.pz=u->pz;
- c->u.pw=1;
+ c->u.pw=0;
 
  // Set up the remaining direction, v=(u x w)  - Mind the signs
  v=cross(&c->u, &c->w);
@@ -589,7 +590,7 @@ struct view *setupView(struct point3D *e, struct point3D *g, struct point3D *up,
  c->v.px=v->px;
  c->v.py=v->py;
  c->v.pz=v->pz;
- c->v.pw=1;
+ c->v.pw=0;
 
  // Copy focal length and window size parameters
  c->f=f;

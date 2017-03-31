@@ -84,7 +84,11 @@ inline void add_col(double r,double g, double b, struct colourRGB* col){
 	col->G+=g;
 	col->B+=b;
 }
-
+inline void add_col(struct colourRGB* _col, struct colourRGB* col){
+	col->R+=_col->R;
+	col->G+=_col->G;
+	col->B+=_col->B;
+}
 /*
    The structure below defines an Object within the World Coordinate Frame.
    For this ray tracer, we will use a simple linked list of objects (not
@@ -161,7 +165,7 @@ struct view{
 int main(int argc, char *argv[]);									// Main raytracing function. 
 void buildScene(void);											// Scene set up. Defines objects and object transformations
 void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col, struct object3D *Os);		// RayTracing routine
-void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os, struct object3D **obj, struct point3D *p, struct point3D *n, double *a, double *b);
+void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os, struct object3D **obj, struct point3D *p, struct point3D *n, double *a, double *b, int depth);
 void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,struct ray3D *ray, int depth, double a, double b, struct colourRGB *col);
 
 #endif
