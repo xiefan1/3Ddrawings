@@ -130,10 +130,6 @@ int main(int argc, char *argv[])
  struct point3D g;
  struct point3D up;
  double du, dv;			// Increase along u and v directions for pixel coordinates
- struct point3D pc,d;		// Point structures to keep the coordinates of a pixel and
-				// the direction or a ray
- struct ray3D *ray;		// Structure to keep the ray from e to a pixel
- struct colourRGB col;		// Return colour for raytraced pixels
  struct colourRGB background;   // Background colour
  int i,j;			// Counters for pixel coordinates
  unsigned char *rgbIm;
@@ -232,12 +228,10 @@ int main(int argc, char *argv[])
  background.R=0;
  background.G=0;
  background.B=0;
- du=cam->wsize/(sx-1);		// du and dv. In the notes in terms of wl and wr, wt and wb,
- dv=-cam->wsize/(sx-1);		// here we use wl, wt, and wsize. du=dv since the image is
-				// and dv is negative since y increases downward in pixel
-				// coordinates and upward in camera coordinates.
+ du=cam->wsize/(sx-1);		// dv is negative since y increases downward in pixel
+ dv=-cam->wsize/(sx-1);		// coordinates and upward in camera coordinates.
 				//Fan: cam->wsize is in distance unit, sx is the resolution
-
+				
  fprintf(stderr,"View parameters:\n");
  fprintf(stderr,"Left=%f, Top=%f, Width=%f, f=%f\n",cam->wl,cam->wt,cam->wsize,cam->f);
  fprintf(stderr,"Camera to world conversion matrix (make sure it makes sense!):\n");
@@ -248,8 +242,13 @@ int main(int argc, char *argv[])
 
  fprintf(stderr,"Rendering rows ");
  
- //initialize points and vectors in the camera space
- point3D origin,ps;
+ int center = 1;
+ int ns=2*center+1; //[ns x ns] subcells per pixel
+ double num = ns*ns;
+ double dsu = du/(ns-1);
+ double dsv = dv/(ns-1); //note dsy is negative
+//initialize points and vectors in the camera space
+ struct point3D origin,ps;
  origin.px=0;
  origin.py=0;
  origin.pz=0;
@@ -260,28 +259,56 @@ int main(int argc, char *argv[])
  ps.pz=cam->f;
  ps.pw=0;
 
+ //openmp multi-threaded
+ #pragma omp parallel for 
  for (j=0;j<sx;j++)		// For each of the pixels in the image
  {
-  for (i=0;i<sx;i++)
+   for (i=0;i<sx;i++)
   {
-    //construct the primary ray
-    ray = newRay(&origin,&ps);
-    //transform the ray into the world space
-    matRayMult(cam->C2W,ray);
 
-    struct colourRGB col={0,0,0};
-    rayTrace(ray,0,&col,NULL);
+    struct colourRGB col_avg={0,0,0};
+    struct point3D copyP;
+    copyPoint(&ps,&copyP);
+
+    //anti-aliasing by supersampling
+    //divide per pixel into nsxns cells and randomly shoot rays
+    int su,sv;
+    for(su=0;su<ns;++su){
+	for(sv=0;sv<ns;++sv){
+	    struct colourRGB col={0,0,0};
+
+	    //for each subcell
+	    //construct the primary ray
+	    struct ray3D *ray = newRay(&origin,&copyP);
+
+	    //transform the ray into the world space
+	    matRayMult(cam->C2W,ray);
+	    rayTrace(ray,0,&col,NULL);
+
+	    //for now, take unweighted avg
+	    add_col(&col,&col_avg);
+	    free(ray);
+	    ray = NULL;
+
+	    //update to the next subcell position
+	    copyP.px+=dsu;
+	}
+	copyP.px=ps.px;
+	copyP.py+=dsv;
+    }
+
+    //take simple average of the color for now
+    col_avg.R /= num;
+    col_avg.G /= num;
+    col_avg.B /= num;
 
     //set color of this pixel
     //printf("(%f, %f, %f)",col.R,col.G,col.B);
-    *(rgbIm+j*sx*3+i*3+0) = col.R*255;
-    *(rgbIm+j*sx*3+i*3+1) = col.G*255;
-    *(rgbIm+j*sx*3+i*3+2) = col.B*255;
+    *(rgbIm+j*sx*3+i*3+0) = col_avg.R*255;
+    *(rgbIm+j*sx*3+i*3+1) = col_avg.G*255;
+    *(rgbIm+j*sx*3+i*3+2) = col_avg.B*255;
 
-    free(ray);
-    ray = NULL;
-
-    //next pixel
+    //update to the next pixel position
     ps.px+=du;
   } // end of this row
   //printf("\n");
