@@ -19,6 +19,7 @@
 #define __RayTracer_header
 
 #define PI 3.14159265354
+#define E  2.71828182846
 /* The structure below is used to hold a single RGB image */
 struct image{
 	void *rgbdata;
@@ -83,6 +84,11 @@ inline void add_col(double r,double g, double b, struct colourRGB* col){
 	col->R+=r;
 	col->G+=g;
 	col->B+=b;
+}
+inline void mult_col(double a, struct colourRGB* col){
+	col->R*=a;
+	col->G*=a;
+	col->B*=a;
 }
 inline void add_col(struct colourRGB* _col, struct colourRGB* col){
 	col->R+=_col->R;
@@ -168,4 +174,5 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col, struct object
 void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os, struct object3D **obj, struct point3D *p, struct point3D *n, double *a, double *b, int depth);
 void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,struct ray3D *ray, int depth, double a, double b, struct colourRGB *col);
 
+void gen_Gaussian_weight(double *table,int size);
 #endif

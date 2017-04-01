@@ -27,6 +27,21 @@ struct object3D *object_list;
 struct pointLS *light_list;
 int MAX_DEPTH;
 
+//generate weights from Gaussian normal function
+//size is always odd
+void gen_Gaussian_weight(double *table,int center){
+    if(!table) return;
+    double coe = 1/(2*PI);
+    int size = center*2+1;
+    for(int i=0;i<size;++i){
+	for(int j=0;j<size;++j){
+	    double x = j - center;
+	    double y = i - center;
+	    double p = -(x*x+y*y)/2;
+	    *(table+i*size+j) = coe*pow(E,p);
+	}
+    }
+}
 void buildScene(void)
 {
  // Sets up all objects in the scene. This involves creating each object,
@@ -246,6 +261,10 @@ int main(int argc, char *argv[])
  double num = ns*ns;
  double dsu = du/(ns-1);
  double dsv = dv/(ns-1); //note dsy is negative
+ double weightG[ns][ns];
+ //compute weight from Gaussian function (low-pass filter)
+ gen_Gaussian_weight(&weightG[0][0],center);
+
  //initialize points and vectors in the camera space
  struct point3D origin;
  origin.px=0;
@@ -286,22 +305,18 @@ int main(int argc, char *argv[])
 	    matRayMult(cam->C2W,ray);
 	    rayTrace(ray,0,&col,NULL);
 
-	    //for now, take unweighted avg
+	    //average the col with Gaussian weight
+	    mult_col(weightG[su][sv],&col);
 	    add_col(&col,&col_avg);
-	    free(ray);
-	    ray = NULL;
 
 	    //update to the next subcell position
 	    copyP.px+=dsu;
+	    free(ray);
+	    ray = NULL;
 	}
 	copyP.px=ps.px;
 	copyP.py+=dsv;
     }
-
-    //take simple average of the color for now
-    col_avg.R /= num;
-    col_avg.G /= num;
-    col_avg.B /= num;
 
     //set color of this pixel
     //printf("(%f, %f, %f)",col.R,col.G,col.B);
@@ -554,5 +569,6 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
  if(col->G>1) col->G=1;
  if(col->B>1) col->B=1;
 }
+
 
 
