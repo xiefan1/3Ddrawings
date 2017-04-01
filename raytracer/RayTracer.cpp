@@ -24,7 +24,7 @@
 // A couple of global structures and data: An object list, a light list, and the
 // maximum recursion depth
 struct object3D *object_list;
-struct pointLS *light_list;
+struct object3D *light_list;
 int MAX_DEPTH;
 
 //generate weights from Gaussian normal function
@@ -60,8 +60,6 @@ void buildScene(void)
  //       forget to set up the inverse transform matrix!
 
  struct object3D *o;
- struct pointLS *l;
- struct point3D p;
 
  ///////////////////////////////////////
  // TO DO: For Assignment 3 you have to use
@@ -81,6 +79,7 @@ void buildScene(void)
 
  // Let's add a plane
  // Note the parameters: ra, rd, rs, rg, R, G, B, alpha, r_index, and shinyness)
+
  o=newPlane(.05,.75,.05,1,.55,.8,.75,1,1,2);	// Note the plane is highly-reflective (rs=rg=.75) so we
 						// should see some reflections if all is done properly.
 						// Colour is close to cyan, and currently the plane is
@@ -98,25 +97,38 @@ void buildScene(void)
  // Let's add a couple spheres
  o=newSphere(.05,.95,.35,.35,1,.25,.25,1,1,10);
  Scale(o,.75,.5,1.5);
- RotateY(o,PI/2);
- Translate(o,-1.45,1.1,3.5);
+ RotateY(o,PI/3);
+ Translate(o,-4,1.1,5);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
- o=newSphere(.05,.95,.95,1,.75,.95,.55,1,1,10);
+ o=newSphere(.05,.95,.95,1,.5,1,.83,1,1,10);
  Scale(o,.5,2.0,1.0);
  RotateZ(o,PI/1.5);
- Translate(o,1.75,1.25,5.0);
+ Translate(o,-4.5,1.25,1.5);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
- // Insert a single point light source.
- p.px=0;
- p.py=15.5;
- p.pz=-5.5;
- p.pw=1;
- l=newPLS(&p,.95,.95,.95);
- insertPLS(l,&light_list);
+ o=newPlane(.05,.75,.05,1,1,1,1,1,1,2);
+ o->isMirror = 1; 			//for mirror, specify all rgb to 1,1,1
+ Scale(o,1.1,2.2,1);
+ RotateY(o,PI/4);
+ Translate(o,3,-2.7,0.7);
+ invert(&o->T[0][0],&o->Tinv[0][0]);	
+ insertObject(o,&object_list);		
+
+
+ o=newSphere(.3,.95,.95,1,.94,.5,.5,.8,1,10);
+ Translate(o,0.5,-3.0,-0.75);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+
+ // Insert a single point light source as sphere
+ o=newSphere(0,0,0,0,.95,.95,.95,1,0,0);
+ o->isLightSource=1;
+ Translate(o,0,15.5,-5.5);
+ insertObject(o,&light_list);
 
  // End of simple scene for Assignment 3
  // Keep in mind that you can define new types of objects such as cylinders and parametric surfaces,
@@ -233,7 +245,8 @@ int main(int argc, char *argv[])
  if (cam==NULL)
  {
   fprintf(stderr,"Unable to set up the view and camera parameters. Our of memory!\n");
-  cleanup(object_list,light_list);
+  cleanup(object_list);
+  cleanup(light_list);
   deleteImage(im);
   exit(0);
  }
@@ -333,7 +346,8 @@ int main(int argc, char *argv[])
  imageOutput(im,output_name);
 
  // Exit section. Clean up and return.
- cleanup(object_list,light_list);		// Object and light lists
+ cleanup(object_list);		// Object and light lists
+ cleanup(light_list);
  deleteImage(im);				// Rendered image
  free(cam);					// camera view
  exit(0);
@@ -469,79 +483,83 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
  multVector(-1,&b);
  b.pw=0;
 
- //for all the light sources
- struct pointLS *cur;
- cur=light_list;
- while(cur!=NULL){
-    double lr,lg,lb;
-    lr=cur->col.R;
-    lg=cur->col.G;
-    lb=cur->col.B;
- 
-    //compute the p->light vector
-    struct point3D s; //the p->light vector
-    copyPoint(&(cur->p0),&s);
-    subVectors(p,&s);
-    s.pw=0;
-    //compute the unit reflection vector
-    struct point3D r;
-    copyPoint(n,&r);
-    double up=2*dot(n,&s);
-    multVector(up,&r);
-    subVectors(&s,&r);
-    normalize(&r);
-    r.pw=0;
-
-
-    /* ambient */
-    add_col(ra*lr*R,ra*lg*G,ra*lb*B,col);
-
-    /* shadow */
-    //create ray from hitObj to light sources
-    struct ray3D *ray_to_light = newRay(p,&s);//note s is not normalized
-    double shadow_t=0;
-    struct object3D* hitObj=NULL;
-    struct point3D _p,_n;
-    findFirstHit(ray_to_light,&shadow_t,obj,&hitObj,&_p,&_n,NULL,NULL,depth);
-    free(ray_to_light);
-    ray_to_light=NULL;
-	
-    //normalize the p->light vector
-    normalize(&s);
+ //if it's mirror, only have reflection component
+ if(obj->isMirror==0){
     
-
-    //if any object blocks the light,
-    //exclude diffuse and specular components
-    if(hitObj == NULL || shadow_t>=1 || shadow_t <=0){
-        /* diffuse */
-        double dim = dot(n,&s);
-        if(dim<0){
-        	if(obj->frontAndBack) dim=-dim;
-    	else dim=0;
+     //for all the light sources
+     struct object3D *cur;
+     cur=light_list;
+     while(cur!=NULL){
+        double lr,lg,lb;
+        lr=cur->col.R;
+        lg=cur->col.G;
+        lb=cur->col.B;
+     
+        //compute the p->light vector
+        struct point3D s={0,0,0,1}; //the p->light vector
+        matVecMult(cur->T,&s);
+        subVectors(p,&s);
+        s.pw=0;
+        //compute the unit reflection vector
+        struct point3D r;
+        copyPoint(n,&r);
+        double up=2*dot(n,&s);
+        multVector(up,&r);
+        subVectors(&s,&r);
+        normalize(&r);
+        r.pw=0;
+    
+    
+        /* ambient */
+        add_col(ra*lr*R,ra*lg*G,ra*lb*B,col);
+    
+        /* shadow (diffuse and specular) */
+        //create ray from hitObj to light sources
+        struct ray3D *ray_to_light = newRay(p,&s);//note s is not normalized
+        double shadow_t=0;
+        struct object3D* hitObj=NULL;
+        struct point3D _p,_n;
+        findFirstHit(ray_to_light,&shadow_t,obj,&hitObj,&_p,&_n,NULL,NULL,depth);
+        free(ray_to_light);
+        ray_to_light=NULL;
+    	
+        //normalize the p->light vector
+        normalize(&s);
+        
+    
+        //if any object blocks the light,
+        //exclude diffuse and specular components
+        if(hitObj == NULL || shadow_t>=1 || shadow_t <=0){
+            /* diffuse */
+            double dim = dot(n,&s);
+            if(dim<0){
+            	if(obj->frontAndBack) dim=-dim;
+        	else dim=0;
+            }
+            add_col(rd*lr*R*dim,rd*lg*G*dim,rd*lb*B*dim,col);
+        
+        
+            /* specular */
+            dim = dot(&b,&r);
+            if(dim<0){
+            	if(obj->frontAndBack) dim=-dim;
+        	else dim=0;
+            }
+            dim = pow(dim,obj->shinyness);
+            add_col(rs*lr*dim,rs*lg*dim,rs*lb*dim,col);
+    
         }
-        add_col(rd*lr*R*dim,rd*lg*G*dim,rd*lb*B*dim,col);
+        //end of shadow
     
+        //next light source
+        cur=cur->next;
+     }
     
-        /* specular */
-        dim = dot(&b,&r);
-        if(dim<0){
-        	if(obj->frontAndBack) dim=-dim;
-    	else dim=0;
-        }
-        dim = pow(dim,obj->shinyness);
-        add_col(rs*lr*dim,rs*lg*dim,rs*lb*dim,col);
-
-    }
-    //end of shadow
-
-     cur=cur->next;
- }
-
- if(col->R>1) col->R=1;
- if(col->G>1) col->G=1;
- if(col->B>1) col->B=1;
- if(col->R==1 && col->G==1 && col->B==1) return;
-
+     if(col->R>1) col->R=1;
+     if(col->G>1) col->G=1;
+     if(col->B>1) col->B=1;
+     if(col->R==1 && col->G==1 && col->B==1) return;
+ } 
 
  /* reflection */
  if(depth<MAX_DEPTH){
