@@ -131,7 +131,6 @@ int main(int argc, char *argv[])
  struct point3D up;
  double du, dv;			// Increase along u and v directions for pixel coordinates
  struct colourRGB background;   // Background colour
- int i,j;			// Counters for pixel coordinates
  unsigned char *rgbIm;
 
  if (argc<5)
@@ -247,24 +246,27 @@ int main(int argc, char *argv[])
  double num = ns*ns;
  double dsu = du/(ns-1);
  double dsv = dv/(ns-1); //note dsy is negative
-//initialize points and vectors in the camera space
- struct point3D origin,ps;
+ //initialize points and vectors in the camera space
+ struct point3D origin;
  origin.px=0;
  origin.py=0;
  origin.pz=0;
  origin.pw=1;
- //direction vector: pixel coordinate-origin
- ps.px=cam->wl;
- ps.py=cam->wt;
- ps.pz=cam->f;
- ps.pw=0;
 
  //openmp multi-threaded
- #pragma omp parallel for 
- for (j=0;j<sx;j++)		// For each of the pixels in the image
+ #pragma omp parallel for
+ for (int j=0;j<sx;j++)		// For each of the pixels in the image
  {
-   for (i=0;i<sx;i++)
+  //direction vector: pixel coordinate-origin
+  struct point3D ps;
+  ps.py=cam->wt+j*dv; //note: dv is negative
+  ps.pz=cam->f;
+  ps.pw=0;
+
+   for (int i=0;i<sx;i++)
   {
+    //update to the current pixel position
+    ps.px=cam->wl+i*du;
 
     struct colourRGB col_avg={0,0,0};
     struct point3D copyP;
@@ -272,9 +274,8 @@ int main(int argc, char *argv[])
 
     //anti-aliasing by supersampling
     //divide per pixel into nsxns cells and randomly shoot rays
-    int su,sv;
-    for(su=0;su<ns;++su){
-	for(sv=0;sv<ns;++sv){
+    for(int su=0;su<ns;++su){
+	for(int sv=0;sv<ns;++sv){
 	    struct colourRGB col={0,0,0};
 
 	    //for each subcell
@@ -308,12 +309,7 @@ int main(int argc, char *argv[])
     *(rgbIm+j*sx*3+i*3+1) = col_avg.G*255;
     *(rgbIm+j*sx*3+i*3+2) = col_avg.B*255;
 
-    //update to the next pixel position
-    ps.px+=du;
   } // end of this row
-  //printf("\n");
-  ps.px=cam->wl; //reset the u corrd.
-  ps.py+=dv; //note: dv is negative
  } // end for j
 
  fprintf(stderr,"\nDone!\n");
