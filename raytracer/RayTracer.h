@@ -140,15 +140,10 @@ struct object3D{
 	int 	frontAndBack;	// Flag to indicate that both sides of the object
 				// should be lit.
 	int	isLightSource;	// Flag to indicate if this is an area light source
+	int isMirror;
 	struct object3D *next;	// Pointer to next entry in object linked list
 };
 
-/* The structure below defines a point light source */
-struct pointLS{
-	struct colourRGB col;	// Light source colour
-	struct point3D p0;	// Light source location
-	struct pointLS *next;	// Pointer to next light in the scene
-};
 
 /*
    The structure below is used to hold camera parameters. You will need
@@ -175,4 +170,7 @@ void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os, struct
 void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,struct ray3D *ray, int depth, double a, double b, struct colourRGB *col);
 
 void gen_Gaussian_weight(double *table,int size);
+struct ray3D* gen_refractionRay(struct object3D* obj, struct point3D* n, struct point3D* b, struct point3D* p);
+struct ray3D* gen_reflectionRay(struct point3D* n, struct point3D* b, struct point3D* p);
+
 #endif

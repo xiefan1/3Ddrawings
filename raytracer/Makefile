@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-g -O2
+CFLAGS=-g -O0
 LIBS=-lm -fopenmp
 SRCS=svdDynamic.cpp RayTracer.cpp utils.cpp 
 

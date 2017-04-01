@@ -151,7 +151,7 @@ inline double length(struct point3D *a)
 
 // Functions to instantiate primitives
 struct point3D *newPoint(double px, double py, double pz);
-struct pointLS *newPLS(struct point3D *p0, double r, double g, double b);
+struct pointLS *newPLS(struct object3D *p0);
 
 // Ray management inlines
 inline void rayPosition(struct ray3D *ray, double lambda, struct point3D *pos)
@@ -221,6 +221,7 @@ void insertPLS(struct pointLS *l, struct pointLS **list);
 void addAreaLight(float sx, float sy, float nx, float ny, float nz,\
                   float tx, float ty, float tz, int lx, int ly,\
                   float r, float g, float b, struct object3D **o_list, struct pointLS **l_list);
+struct object3D* addSphereLight(double r, double g, double b);
 
 // Function to set up the camera and viewing coordinate frame.
 // You will have to add code to this function's body in utils.c
@@ -233,10 +234,10 @@ struct image *newImage(int size_x, int size_y);
 void imageOutput(struct image *im, const char *filename);
 void deleteImage(struct image *im);
 
-// Cleanup: Release memory allocated to objects and light sources. Note that you will
+// Cleanup: Release memory allocated to objects (light sources are also objects). Note that you will
 // need to do your own clean-up wherever you have requested ray positions,
 // since each call to the ray position function returns a newly allocated point3D
 // structure.
-void cleanup(struct object3D *o_list, struct pointLS *l_list);
+void cleanup(struct object3D *o_list);
 
 #endif

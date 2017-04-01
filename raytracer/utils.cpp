@@ -37,27 +37,6 @@ struct point3D *newPoint(double px, double py, double pz)
  return(pt);
 }
 
-struct pointLS *newPLS(struct point3D *p0, double r, double g, double b)
-{
- // Allocate a new point light sourse structure. Initialize the light
- // source to the specified RGB colour
- // Note that this is a point light source in that it is a single point
- // in space, if you also want a uniform direction for light over the
- // scene (a so-called directional light) you need to place the
- // light source really far away.
-
- struct pointLS *ls=(struct pointLS *)calloc(1,sizeof(struct pointLS));
- if (!ls) fprintf(stderr,"Out of memory allocating light source!\n");
- else
- {
-  memcpy(&ls->p0,p0,sizeof(struct point3D));	// Copy light source location
-
-  ls->col.R=r;					// Store light source colour and
-  ls->col.G=g;					// intensity
-  ls->col.B=b;
- }
- return(ls);
-}
 
 /////////////////////////////////////////////
 // Ray and normal transforms
@@ -109,9 +88,12 @@ struct object3D *newPlane(double ra, double rd, double rs, double rg, double r, 
   plane->textureMap=&texMap;
   plane->frontAndBack=1;
   plane->isLightSource=0;
+  plane->isMirror=0;
  }
  return(plane);
 }
+
+
 
 struct object3D *newSphere(double ra, double rd, double rs, double rg, double r, double g, double b, double alpha, double r_index, double shiny)
 {
@@ -146,6 +128,7 @@ struct object3D *newSphere(double ra, double rd, double rs, double rg, double r,
   sphere->textureMap=&texMap;
   sphere->frontAndBack=0;
   sphere->isLightSource=0;
+  sphere->isMirror=0;
  }
  return(sphere);
 }
@@ -188,8 +171,7 @@ void planeIntersect(struct object3D *plane, struct ray3D *ray, double *lambda,
 	ray->rayPos(ray, t, _p);
 	_n->px=0;
 	_n->py=0;
-	if(ray->d.pz>0) _n->pz=-1;
-	else _n->pz=1;
+	_n->pz=-1;
 	_n->pw=0;
     }
     //convert back the ray into the object world
@@ -304,26 +286,10 @@ void insertObject(struct object3D *o, struct object3D **list)
  }
 }
 
-void insertPLS(struct pointLS *l, struct pointLS **list)
-{
- if (l==NULL) return;
- // Inserts a light source into the list of light sources
- if (*(list)==NULL)
- {
-  *(list)=l;
-  (*(list))->next=NULL;
- }
- else
- {
-  l->next=(*(list))->next;
-  (*(list))->next=l;
- }
-
-}
 
 void addAreaLight(float sx, float sy, float nx, float ny, float nz,\
                   float tx, float ty, float tz, int lx, int ly,\
-                  float r, float g, float b, struct object3D **o_list, struct pointLS **l_list)
+                  float r, float g, float b, struct object3D **o_list, struct object3D **l_list)
 {
  /*
    This function sets up and inserts a rectangular area light source
@@ -812,13 +778,13 @@ void deleteImage(struct image *im)
  }
 }
 
-void cleanup(struct object3D *o_list, struct pointLS *l_list)
+void cleanup(struct object3D *o_list)
 {
- // De-allocates memory reserved for the object list and the point light source
+ // Everything is stored as object3D including light sources
+ // De-allocates memory reserved for the object list
  // list. Note that *YOU* must de-allocate any memory reserved for images
  // rendered by the raytracer.
  struct object3D *p, *q;
- struct pointLS *r, *s;
 
  p=o_list;		// De-allocate all memory from objects in the list
  while(p!=NULL)
@@ -833,6 +799,7 @@ void cleanup(struct object3D *o_list, struct pointLS *l_list)
   p=q;
  }
 
+/*
  r=l_list;
  while(r!=NULL)
  {
@@ -840,4 +807,5 @@ void cleanup(struct object3D *o_list, struct pointLS *l_list)
   free(r);
   r=s;
  }
+*/
 }
