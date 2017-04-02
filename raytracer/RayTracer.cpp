@@ -101,38 +101,38 @@ void buildScene(void)
  o=newSphere(.05,.95,.35,.35,.5,1,.83,1,1,10);
  Scale(o,.75,.5,1.5);
  RotateY(o,PI/3);
- Translate(o,-4,1.1,5);
+ Translate(o,-3,1.1,5);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
  //a tranparent ellipse
- o=newSphere(.05,.95,.95,1,.8,.5,.3,0.8,1.52,10);
+ o=newSphere(.05,.05,.95,1,.8,.5,.3,0.8,1.52,10);
  Scale(o,.5,2.0,1.0);
- RotateZ(o,PI/1.5);
- Translate(o,-4.5,-2,1.5);
+ RotateZ(o,PI/1.8);
+ Translate(o,-3.5,-2,1.5);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
  //a mirror
  o=newPlane(.05,.75,.05,1,1,1,1,1,1,2);
  o->isMirror = 1; 			//for mirror, specify all rgb to 1,1,1
- Scale(o,2.2,1.1,1);
- RotateX(o,-PI/12);
- RotateY(o,PI/4);
- Translate(o,2,.5,2.8);
+ Scale(o,3.3,2.5,1);
+ RotateY(o,PI/3.5);
+ RotateZ(o,-PI/19);
+ Translate(o,3,-1,3);
  invert(&o->T[0][0],&o->Tinv[0][0]);	
  insertObject(o,&object_list);		
 
  //an opague refractive sphere
  o=newSphere(.3,.95,.95,1,.94,.5,.5,1,1.52,10);
- Translate(o,0.5,1.7,0.75);
+ Translate(o,-1,0,1);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
  //an transparent sphere
- o=newSphere(.1,0,.95,.5,.94,1,.5,0,1.42,10);
- Scale(o,1,1,0.5);
- Translate(o,-1,-3.0,-0);
+ o=newSphere(.1,0.05,.95,.5,.94,1,.5,0.1,1.42,10);
+ Scale(o,1.3,1.3,1.3);
+ Translate(o,-1.5,-3,.5);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
@@ -179,10 +179,10 @@ int main(int argc, char *argv[])
  if (argc<5)
  {
   fprintf(stderr,"RayTracer: Can not parse input parameters\n");
-  fprintf(stderr,"USAGE: RayTracer size rec_depth antialias output_name\n");
+  fprintf(stderr,"USAGE: RayTracer size rec_depth softshadow output_name\n");
   fprintf(stderr,"   size = Image size (both along x and y)\n");
   fprintf(stderr,"   rec_depth = Recursion depth\n");
-  fprintf(stderr,"   antialias = A single digit, 0 disables antialiasing. Anything else enables antialiasing\n");
+  fprintf(stderr,"   softshadow = A single digit, 0 disables softshadow. Anything else enables softshadow\n");
   fprintf(stderr,"   output_name = Name of the output file, e.g. MyRender.ppm\n");
   exit(0);
  }
@@ -193,8 +193,9 @@ int main(int argc, char *argv[])
 
  fprintf(stderr,"Rendering image at %d x %d\n",sx,sx);
  fprintf(stderr,"Recursion depth = %d\n",MAX_DEPTH);
- if (!antialiasing) fprintf(stderr,"Antialising is off\n");
- else fprintf(stderr,"Antialising is on\n");
+ if (!antialiasing) fprintf(stderr,"Softshadow is off\n");
+ else fprintf(stderr,"Softshadow is on\n");
+ fprintf(stderr,"Anti-aliasing is always on\n");
  fprintf(stderr,"Output file name: %s\n",output_name);
 
  object_list=NULL;
@@ -388,12 +389,6 @@ void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
     int initial=1;
     struct object3D *cur_obj=object_list;
     while(cur_obj!=NULL){
-	//make one object can not intersect with itself
-	//to avoid errors caused by rounding precision errors etc.
-	if(cur_obj == Os){
-	    cur_obj=cur_obj->next;
-	    continue;
-	}
 
 	double temp=0; //temporary lambda
 	cur_obj->intersect(cur_obj,ray,&temp,p,n,a,b);
@@ -439,7 +434,7 @@ struct ray3D* gen_refractionRay(struct object3D* obj, struct point3D* n, struct 
     //if rays goes from air to object, cosTheta < 0
     double cosTheta = dot(n,&d);
     struct point3D temp;
-    if(cosTheta<0){
+//    if(cosTheta<0){
 	//air-object interface
 	double coef1 = (1-cosTheta*cosTheta)/(nt*nt);
 	assert(coef1<=1);
@@ -449,7 +444,7 @@ struct ray3D* gen_refractionRay(struct object3D* obj, struct point3D* n, struct 
 	temp.pz = ((d.pz-n->pz*cosTheta)/nt) - n->pz*coef1;
 	temp.pw = 0;
 	normalize(&temp);
-    }else{
+/*    }else{
 	//object-air interface
 	double cosPhi = 1- nt*nt*(1-cosTheta*cosTheta);
 	assert(cosPhi<=1);
@@ -460,7 +455,7 @@ struct ray3D* gen_refractionRay(struct object3D* obj, struct point3D* n, struct 
 	temp.pw = 0;
 	normalize(&temp);
     }
-
+*/
     return(newRay(p,&temp));
 }
 
@@ -596,10 +591,11 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
 
 	//shoot multiple rays from p to the light source
 	int numRays=1;
-	if(antialiasing==1) numRays = 10;//turn on anti-aliasing
+	if(antialiasing==1) numRays = 10;//turn on soft-shadow
 
 	for(int light_i=0;light_i<numRays;++light_i){
             //create ray from hitObj to a random point on light source
+	    double lightItensity = 1;
     	    struct point3D shadowRay={0,0,0,1}; //it's still a point for now
 	    double theta = 2*PI*drand48();
 	    double phi = 2*PI*drand48();
@@ -624,7 +620,11 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
         
             //if any object blocks the light,
             //exclude diffuse and specular components
-            if(hitObj == NULL || shadow_t>=1 || shadow_t <=0){
+            if(hitObj != NULL && shadow_t<1 && shadow_t > 0) lightItensity = 0;
+	    if(hitObj!=NULL && hitObj->alpha<1) lightItensity = 1-hitObj->alpha;
+	    //a simple model for now, it should be recursively factored by all the alpha
+
+	    if(lightItensity>0){
 		struct colourRGB col_ds={0,0,0};
                 /* diffuse */
                 double dim = dot(n,&s);
@@ -644,7 +644,7 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
                 dim = pow(dim,obj->shinyness);
                 add_col(rs*lr*dim,rs*lg*dim,rs*lb*dim,&col_ds);
 
-		mult_col(((double)1/numRays),&col_ds);
+		mult_col(lightItensity*((double)1/numRays),&col_ds);
 		add_col(&col_ds,col);
         
             }

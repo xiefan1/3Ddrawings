@@ -140,7 +140,6 @@ inline void multVector(double a, struct point3D *b){
  b->px=b->px*a;
  b->py=b->py*a;
  b->pz=b->pz*a;
- b->pw=1;               // Mind the homogeneous coordinate!
 }
 
 inline double length(struct point3D *a)
@@ -177,6 +176,11 @@ inline struct ray3D *newRay(struct point3D *p0, struct point3D *d)
   memcpy(&ray->p0,p0,sizeof(struct point3D));
   memcpy(&ray->d,d,sizeof(struct point3D));
   ray->rayPos=&rayPosition;
+  //add an offset on p0 to avoid errors caused by rounding etc.
+  ray->p0.px+=0.001*d->px;
+  ray->p0.py+=0.001*d->py;
+  ray->p0.pz+=0.001*d->pz;
+
  }
  return(ray);
 }

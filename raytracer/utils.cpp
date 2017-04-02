@@ -218,6 +218,9 @@ void sphereIntersect(struct object3D *sphere, struct ray3D *ray, double *lambda,
 	    _n->py=_p->py;
 	    _n->pz=_p->pz;
 	    _n->pw=0;
+	    if(dot(_n,&(ray->d))>0){
+		multVector(-1.0,_n);
+	    }
 	}
     }
 
