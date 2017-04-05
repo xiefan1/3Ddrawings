@@ -141,7 +141,11 @@ struct object3D{
 				// should be lit.
 	int	isLightSource;	// Flag to indicate if this is an area light source
 	int isMirror;
+	int goingOut; //flag to indicate: 1 -- ray is shooting from inside of the object to the world
+			//this flag is set by intersect function
 	struct object3D *next;	// Pointer to next entry in object linked list
+	struct object3D *left;  //Bounding volume hierarchy Binary tree
+	struct object3D *right;
 };
 
 
@@ -166,8 +170,12 @@ struct view{
 int main(int argc, char *argv[]);									// Main raytracing function. 
 void buildScene(void);											// Scene set up. Defines objects and object transformations
 void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col, struct object3D *Os);		// RayTracing routine
-void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os, struct object3D **obj, struct point3D *p, struct point3D *n, double *a, double *b, int depth);
-void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,struct ray3D *ray, int depth, double a, double b, struct colourRGB *col);
+void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os, struct object3D **obj,
+		    struct point3D *p, struct point3D *n, double *a, double *b, int depth);
+void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n,struct ray3D *ray,
+		    int depth, double a, double b, struct colourRGB *col);
+//environment mapping
+void bgMap(struct ray3D* ray, struct colourRGB* col);
 
 void gen_Gaussian_weight(double *table,int size);
 struct ray3D* gen_refractionRay(struct object3D* obj, struct point3D* n, struct point3D* b, struct point3D* p);

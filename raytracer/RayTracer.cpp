@@ -21,14 +21,18 @@
 #include "utils.h"
 #include "assert.h"
 #define maxlight 10
+//#define DEBUGTEXT
+//#define DEBUGRGB
 
 // A couple of global structures and data: An object list, a light list, and the
 // maximum recursion depth
 struct object3D *object_list;
 struct object3D *light_list;
 double light_radius[maxlight];
+struct object3D *backgroundObj;
 int MAX_DEPTH;
 int antialiasing;	// Flag to determine whether antialiaing is enabled or disabled
+FILE *debugUV;
 
 //generate weights from Gaussian normal function
 //size is always odd
@@ -62,36 +66,30 @@ void buildScene(void)
  // NOTE: After setting up the transformations for each object, don't
  //       forget to set up the inverse transform matrix!
 
+
+ //set up the backgroud as a huge sphere
+ backgroundObj = newSphere(0,0,0,0,0,0,0,0,0,0);
+ Scale(backgroundObj,20,10,20);
+ invert(&backgroundObj->T[0][0],&backgroundObj->Tinv[0][0]);
+ //loadTexture(backgroundObj,"texture/starSphere.ppm");
+
+
  struct object3D *o;
 
- ///////////////////////////////////////
- // TO DO: For Assignment 3 you have to use
- //        the simple scene provided
- //        here, but for Assignment 4 you
- //        *MUST* define your own scene.
- //        Part of your mark will depend
- //        on how nice a scene you
- //        create. Use the simple scene
- //        provided as a sample of how to
- //        define and position objects.
- ///////////////////////////////////////
-
- // Simple scene for Assignment 3:
- // Insert a couple of objects. A plane and two spheres
- // with some transformations.
-
- // Let's add a plane
  // Note the parameters: ra, rd, rs, rg, R, G, B, alpha, r_index, and shinyness)
 
- o=newPlane(.1,.75,.05,.35,.55,.8,.75,1,1,2);	// Note the plane is highly-reflective (rs=rg=.75) so we
+ o=newPlane(.1,.75,.05,.35,.55,.8,.75,1,1.33,2);	// Note the plane is highly-reflective (rs=rg=.75) so we
 						// should see some reflections if all is done properly.
 						// Colour is close to cyan, and currently the plane is
 						// completely opaque (alpha=1). The refraction index is
 						// meaningless since alpha=1
- Scale(o,16,16,1);				// Do a few transforms...
+// Scale(o,10,10,1);				// Do a few transforms...
+ Scale(o,40,60,1);				// Do a few transforms...
  RotateZ(o,PI/1.20);
  RotateX(o,PI/2.25);
  Translate(o,0,-3,10);
+// loadTexture(o,"texture/medium_check.ppm");
+ loadTexture(o,"texture/lake1.ppm");
  invert(&o->T[0][0],&o->Tinv[0][0]);		// Very important! compute
 						// and store the inverse
 						// transform for this object!
@@ -101,12 +99,12 @@ void buildScene(void)
  o=newSphere(.05,.95,.35,.35,.5,1,.83,1,1,10);
  Scale(o,.75,.5,1.5);
  RotateY(o,PI/3);
- Translate(o,-3,1.1,5);
+ Translate(o,-3,0.1,5);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
  //a tranparent ellipse
- o=newSphere(.05,.05,.95,1,.8,.5,.3,0.8,1.52,10);
+ o=newSphere(.3,.5,.95,1,1,1,.2,1,1.52,10);
  Scale(o,.5,2.0,1.0);
  RotateZ(o,PI/1.8);
  Translate(o,-3.5,-2,1.5);
@@ -124,18 +122,52 @@ void buildScene(void)
  insertObject(o,&object_list);		
 
  //an opague refractive sphere
- o=newSphere(.3,.95,.95,1,.94,.5,.5,1,1.52,10);
- Translate(o,-1,0,1);
+ o=newSphere(.2,.95,.95,1,.94,.5,.5,1,1.52,10);
+ Translate(o,-1,-.5,1);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+/* //an transparent plane
+ o=newPlane(.05,.1,.7,1,1,1,1,.5,1.5,2);
+ Translate(o,-1,1.5,-1);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+*/
+
+ //an opague cone (head)
+ o=newCone(.2,.5,.8,.8,.8,.8,1,1,1.52,10);
+ Translate(o,-3,0,-2);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+ //an opague paraboloid
+ o=newParaboloid(.2,.5,.1,.3,.8,.8,1,1,1.52,10);
+ Translate(o,0,-2,-2);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
  //an transparent sphere
- o=newSphere(.1,0.05,.95,.5,.94,1,.5,0.1,1.42,10);
+ o=newSphere(.1,.1,.6,.8,1,1,1,.2,1.42,10);
  Scale(o,1.3,1.3,1.3);
- Translate(o,-1.5,-3,.5);
+ Translate(o,0,3,1);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
+
+/*
+ //an opague refractive sphere
+ o=newSphere(.3,.95,.95,.5,.94,.5,.5,1,1.52,10);
+ Translate(o,-1.9,0,1);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+ //an opaque plane
+ o=newPlane(.05,.75,.05,1,.8,.5,.3,1,1,10);
+ Scale(o,3.3,2.5,1);
+ RotateY(o,-PI/3.5);
+ Translate(o,0,0,0);
+ invert(&o->T[0][0],&o->Tinv[0][0]);	
+ insertObject(o,&object_list);		
+*/
 
  // Insert a single point light source as sphere
  double r1=3;
@@ -234,16 +266,16 @@ int main(int argc, char *argv[])
 
  // Camera center is at (0,0,-1)
  e.px=0;
- e.py=0;
- e.pz=-6;
+ e.py=5;
+ e.pz=-10;
  e.pw=1;
 
  // To define the gaze vector, we choose a point 'pc' in the scene that
  // the camera is looking at, and do the vector subtraction pc-e.
  // Here we set up the camera to be looking at the origin, so g=(0,0,0)-(0,0,-1)
  g.px=0;
- g.py=-0.1;
- g.pz=1;
+ g.py=-2;
+ g.pz=10;
  g.pw=0;
  normalize(&g);
 
@@ -301,6 +333,13 @@ int main(int argc, char *argv[])
  origin.py=0;
  origin.pz=0;
  origin.pw=1;
+ #ifdef DEBUGRGB
+FILE *debugRGB=fopen("rgb.txt","wb+");
+#endif
+ #ifdef DEBUGTEXT
+debugUV=fopen("uv.txt","wb+");
+#endif
+
 
  //openmp multi-threaded
  #pragma omp parallel for
@@ -320,7 +359,6 @@ int main(int argc, char *argv[])
     struct colourRGB col_avg={0,0,0};
     struct point3D copyP;
     copyPoint(&ps,&copyP);
-
     //anti-aliasing by supersampling
     //divide per pixel into nsxns cells and randomly shoot rays
     for(int su=0;su<ns;++su){
@@ -354,8 +392,25 @@ int main(int argc, char *argv[])
     *(rgbIm+j*sx*3+i*3+1) = col_avg.G*255;
     *(rgbIm+j*sx*3+i*3+2) = col_avg.B*255;
 
+ #ifdef DEBUGRGB
+    fprintf(debugRGB,"(%d %d %d) ",(int)(col_avg.R*255),(int)(col_avg.G*255),(int)(col_avg.B*255));
+/*    if(col_avg.R*255>=100)
+	printf("wrong!\n");
+	*/
+ #endif
+
   } // end of this row
+ #ifdef DEBUGRGB
+  fprintf(debugRGB,"\n\n");
+ #endif
  } // end for j
+
+ #ifdef DEBUGRGB
+ fclose(debugRGB);
+ #endif
+ #ifdef DEBUGTEXT
+ fclose(debugUV);
+ #endif
 
  fprintf(stderr,"\nDone!\n");
 
@@ -387,11 +442,14 @@ void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
     *lambda = -1;
     *obj = NULL;
     int initial=1;
+    double temp=0; //temporary lambda
+    struct point3D _n,_p;
+    double _a,_b;
+
     struct object3D *cur_obj=object_list;
     while(cur_obj!=NULL){
 
-	double temp=0; //temporary lambda
-	cur_obj->intersect(cur_obj,ray,&temp,p,n,a,b);
+	cur_obj->intersect(cur_obj,ray,&temp,&_p,&_n,&_a,&_b);
 
 	//Q1:should it compare with 1 instead??
 	if(temp>0){
@@ -405,11 +463,17 @@ void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
 		// transform normal vectors n
 		double Tinv_trans[4][4]={0};
 		transpose(&(cur_obj->Tinv[0][0]),&(Tinv_trans[0][0]));
-		matVecMult(Tinv_trans,n);
-		normalize(n);
+		matVecMult(Tinv_trans,&_n);
+		normalize(&_n);
 
 		// transform the intersect point p
-		matVecMult(cur_obj->T,p);
+		matVecMult(cur_obj->T,&_p);
+
+		memcpy(n,&_n,sizeof(struct point3D));
+		memcpy(p,&_p,sizeof(struct point3D));
+
+		*a=_a;
+		*b=_b;
 	    }
 	}
 
@@ -419,43 +483,54 @@ void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
 
 
 // generate unit refraction ray
-// Warning: this function assumes air-object or object-air interface
+// alpha will be recalculated by this function, as transmittance T
 // n - normal unit vector
 // b - intersection to eye unit vector
 // p - intersection point
 struct ray3D* gen_refractionRay(struct object3D* obj, struct point3D* n, struct point3D* b, struct point3D* p){
-    double nt = obj->r_index;
     struct point3D d;
     d.px=-(b->px);
     d.py=-(b->py);
     d.pz=-(b->pz);
     d.pw=1;
 
-    //if rays goes from air to object, cosTheta < 0
-    double cosTheta = dot(n,&d);
-    struct point3D temp;
-//    if(cosTheta<0){
-	//air-object interface
-	double coef1 = (1-cosTheta*cosTheta)/(nt*nt);
-	assert(coef1<=1);
-	coef1 = sqrt(1-coef1);
-	temp.px = ((d.px-n->px*cosTheta)/nt) - n->px*coef1;
-	temp.py = ((d.py-n->py*cosTheta)/nt) - n->py*coef1;
-	temp.pz = ((d.pz-n->pz*cosTheta)/nt) - n->pz*coef1;
-	temp.pw = 0;
-	normalize(&temp);
-/*    }else{
-	//object-air interface
-	double cosPhi = 1- nt*nt*(1-cosTheta*cosTheta);
-	assert(cosPhi<=1);
-	cosPhi = sqrt(1-cosPhi);
-	temp.px = ((d.px-n->px*cosTheta)*nt) + n->px*cosPhi;
-	temp.py = ((d.py-n->py*cosTheta)*nt) + n->py*cosPhi;
-	temp.pz = ((d.pz-n->pz*cosTheta)*nt) + n->pz*cosPhi;
-	temp.pw = 0;
-	normalize(&temp);
+    double ni, nt;
+    double cosCritical=-1;//critical angle for total internal reflection
+    if(!obj->goingOut){
+	nt = obj->r_index;
+	ni = 1.0;
+    }else{
+	ni = obj->r_index;
+	nt = 1.0;
+    	//critical angle cosine
+	if(ni>nt){
+	    double temp = nt/ni;
+    	    cosCritical = sqrt(1-temp*temp);
+	}
     }
-*/
+
+    double cosTheta = dot(n,b);
+    //if theta > critical angle, no reflection
+    if(cosTheta < cosCritical)
+	return 0;
+
+    struct point3D temp;
+    double cosPhi = (1-cosTheta*cosTheta)*(ni*ni)/(nt*nt);
+    assert(cosPhi<=1);
+    cosPhi = sqrt(1-cosPhi);
+    temp.px = ((d.px-n->px*cosTheta)*ni/nt) - n->px*cosPhi;
+    temp.py = ((d.py-n->py*cosTheta)*ni/nt) - n->py*cosPhi;
+    temp.pz = ((d.pz-n->pz*cosTheta)*ni/nt) - n->pz*cosPhi;
+    temp.pw = 0;
+    normalize(&temp);
+    
+    //recalculate alpha, i.e. tranmittance
+    //t is fresnel (transmission) coefficient, TE mode
+    double t = 2*ni*cosTheta/(ni*cosTheta+nt*cosPhi);
+    obj->alpha = nt*cosPhi*t*t/(ni*cosTheta);
+    assert(obj->alpha<1);
+    assert(obj->alpha>0);
+
     return(newRay(p,&temp));
 }
 
@@ -506,8 +581,28 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
             //if hit an object
 	    //Phong illumination
 	    rtShade(hitObj,&p,&n,ray,depth,a,b,col);
-	    //if(hitObj->frontAndBack==1) printf("plane normal (%f,%f,%f)\n",n.px,n.py,n.pz);
+
+	    #ifdef DEBUGTEXT
+	    if(hitObj->texImg){
+		fprintf(debugUV,"%.3f %.3f    ",a,b);
+	    }
+	    #endif
+	}else{
+	    //environment mapping
+	    //get color from the background
+	    if(backgroundObj->texImg!=NULL)
+    		bgMap(ray,col);
 	}
+}
+
+void bgMap(struct ray3D* ray, struct colourRGB* col){
+	double t=0;
+	struct point3D _n,_p;
+	double u,v;
+	backgroundObj->intersect(backgroundObj,ray,&t,&_p,&_n,&u,&v);
+	assert(u>=0 && u<1 && v>=0 && v<1);
+	//fill in col with the texture RGB colour
+	backgroundObj->textureMap(backgroundObj->texImg,u,v,&col->R,&col->G,&col->B);
 }
 
 
@@ -525,6 +620,17 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
 void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct ray3D *ray,
 				int depth, double _a, double _b, struct colourRGB *col)
 {
+//ray shoot on the back face 
+int backface = 0;
+if(dot(n,&ray->d)>=0)
+	if(obj->frontAndBack)
+	    backface=1;
+	else return; 
+
+
+ if(!obj->frontAndBack && dot(n,&ray->d)>=0) return; //ray shoot on the back face ( of plane object)
+ if(col->R==1 && col->G==1 && col->B==1) return;
+
  double R,G,B;			// Colour for the object in R G and B
 
  if (obj->texImg==NULL)		// Not textured, use object colour
@@ -540,12 +646,6 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
   obj->textureMap(obj->texImg,_a,_b,&R,&G,&B);
  }
 
- double ra,rd,rs,rg;
- ra=obj->alb.ra;
- rd=obj->alb.rd;
- rs=obj->alb.rs;
- rg=obj->alb.rg;
-
  //compute the unit p->OS(eye) vector
  struct point3D b;
  copyPoint(&(ray->d),&b);
@@ -553,13 +653,67 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
  multVector(-1,&b);
  b.pw=0;
 
- //if it's mirror, only have reflection component
+ //note: alpha and ra,rd,rs,rg will be recalculated if this object is refractive
+ //alpha will be set to the transmittance T, ra+rd+rs will be set to reflectance R
+ // T+R = 1
+ double alpha = obj->alpha;
+ double ra,rd,rs,rg;
+ ra=obj->alb.ra;
+ rd=obj->alb.rd;
+ rs=obj->alb.rs;
+ rg=obj->alb.rg;
+
+ struct ray3D* rRay;
+
+ /*refraction*/
+ if(depth<MAX_DEPTH && alpha<1){
+
+	struct colourRGB col_refract={0,0,0};
+	struct point3D n_copy;
+	copyPoint(n,&n_copy);
+
+	if(backface){
+	    multVector(-1,&n_copy);
+	}
+
+	//alpha will be recalculated by this function
+	rRay = gen_refractionRay(obj,&n_copy,&b,p);
+
+	if(rRay != NULL){
+		//reset alpha, ra-rg
+		alpha = obj->alpha;
+		ra *=(1-alpha);
+		rd *=(1-alpha);
+		rs *=(1-alpha);
+		rg *=(1-alpha);
+	
+		rayTrace(rRay,depth+1,&col_refract,obj);
+	    	free(rRay);
+	      	rRay=NULL;
+		//note: alpha is set to the transmittance by the above function.
+		//i.e. the larger the alpha, the more transparent this object is
+		col_refract.R*=alpha*R;
+		col_refract.G*=alpha*G;
+		col_refract.B*=alpha*B;
+		add_col(&col_refract,col);
+
+		if(col->R>=1 && col->G>=1 && col->B>=1){
+		     col->R=1;
+		     col->G=1;
+		     col->B=1;
+		     return;
+		}
+	 }
+ }
+
+ //if this object is not a mirror, compute the local illumination (Phong model).
  if(obj->isMirror==0){
     
      //for all the light sources
      struct object3D *cur;
      int num_light=0;
      cur=light_list;
+
      while(cur!=NULL){
         double lr,lg,lb;
         lr=cur->col.R;
@@ -589,9 +743,10 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
     
         /* shadow (diffuse and specular) */
 
-	//shoot multiple rays from p to the light source
+	//if soft-shadoe is enabled,
+	//shoot multiple rays towards the light source
 	int numRays=1;
-	if(antialiasing==1) numRays = 10;//turn on soft-shadow
+	if(antialiasing==1) numRays = 10;
 
 	for(int light_i=0;light_i<numRays;++light_i){
             //create ray from hitObj to a random point on light source
@@ -608,21 +763,26 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
             subVectors(p,&shadowRay);
             shadowRay.pw=0; //now it's a vector
         
-	    //note shadow shall not be normalized
+	    //note shadow ray shall not be normalized
             struct ray3D *ray_to_light = newRay(p,&shadowRay);
-            double shadow_t=0;
+            double shadow_t=0, a_temp, b_temp;
             struct object3D* hitObj=NULL;
             struct point3D _p,_n;
-            findFirstHit(ray_to_light,&shadow_t,obj,&hitObj,&_p,&_n,NULL,NULL,depth);
+            findFirstHit(ray_to_light,&shadow_t,obj,&hitObj,&_p,&_n,&a_temp,&b_temp,depth);
             free(ray_to_light);
             ray_to_light=NULL;
            
         
-            //if any object blocks the light,
-            //exclude diffuse and specular components
-            if(hitObj != NULL && shadow_t<1 && shadow_t > 0) lightItensity = 0;
-	    if(hitObj!=NULL && hitObj->alpha<1) lightItensity = 1-hitObj->alpha;
+            //if any opaque object blocks the light,
+            //no diffuse and specular components.
+	    //if the hitObj is transparent,
 	    //a simple model for now, it should be recursively factored by all the alpha
+            if(hitObj != NULL && shadow_t>0 && shadow_t < 1){
+		if(hitObj->alpha<1)
+		    lightItensity *= alpha;
+		else
+		    lightItensity = 0;
+	    }
 
 	    if(lightItensity>0){
 		struct colourRGB col_ds={0,0,0};
@@ -653,48 +813,35 @@ void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct 
         //next light source
         cur=cur->next;
 	num_light+=1;
-     }
-    
-     if(col->R>1) col->R=1;
-     if(col->G>1) col->G=1;
-     if(col->B>1) col->B=1;
-     if(col->R==1 && col->G==1 && col->B==1) return;
+     }    
  } 
+ if(col->R>=1 && col->G>=1 && col->B>=1){
+      col->R=1;
+      col->G=1;
+      col->B=1;
+      return;
+ }
 
- if(depth<MAX_DEPTH){
+
+ /* reflection */
+ if(depth<MAX_DEPTH && !backface){
     struct colourRGB col_ref={0,0,0};
-    double alpha = obj->alpha;
 
-    /* reflection */
     //generate the reflection ray
-    struct ray3D* rRay = gen_reflectionRay(n,&b,p);
+    rRay = gen_reflectionRay(n,&b,p);
     //recursive call of rayTrace
     rayTrace(rRay,depth+1,&col_ref,obj);
     free(rRay);
     rRay=NULL;
-    col_ref.R*=rg*R*alpha;
-    col_ref.G*=rg*G*alpha;
-    col_ref.B*=rg*B*alpha;
+    col_ref.R*=rg*R;
+    col_ref.G*=rg*G;
+    col_ref.B*=rg*B;
     add_col(&col_ref,col);
+ }    
 
-
-    /*refraction*/
-    if(alpha<1){
-	rRay = gen_refractionRay(obj,n,&b,p);
-	struct colourRGB col_refract={0,0,0};
-	rayTrace(rRay,depth+1,&col_refract,obj);
-    	free(rRay);
-      	rRay=NULL;
-	col_ref.R*=(1-alpha)*R;
-	col_ref.G*=(1-alpha)*G;
-	col_ref.B*=(1-alpha)*B;
-	add_col(&col_refract,col);
-   }
-
- }
  if(col->R>1) col->R=1;
  if(col->G>1) col->G=1;
  if(col->B>1) col->B=1;
-}
+}     
 
 

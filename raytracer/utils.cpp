@@ -8,6 +8,8 @@
 */
 
 #include "utils.h"
+#include "cmath"
+#include "assert.h"
 
 // A useful 4x4 identity matrix which can be used at any point to
 // initialize or reset object transformations
@@ -89,13 +91,17 @@ struct object3D *newPlane(double ra, double rd, double rs, double rg, double r, 
   plane->frontAndBack=1;
   plane->isLightSource=0;
   plane->isMirror=0;
+  plane->goingOut=0;
+  plane->left=NULL;
+  plane->right=NULL;
  }
  return(plane);
 }
 
 
 
-struct object3D *newSphere(double ra, double rd, double rs, double rg, double r, double g, double b, double alpha, double r_index, double shiny)
+struct object3D *newSphere(double ra, double rd, double rs, double rg, double r, double g,
+				double b, double alpha, double r_index, double shiny)
 {
  // Intialize a new sphere with the specified parameters:
  // ra, rd, rs, rg - Albedos for the components of the Phong model
@@ -129,8 +135,81 @@ struct object3D *newSphere(double ra, double rd, double rs, double rg, double r,
   sphere->frontAndBack=0;
   sphere->isLightSource=0;
   sphere->isMirror=0;
+  sphere->goingOut=0;
+  sphere->left=NULL;
+  sphere->right=NULL;
  }
  return(sphere);
+}
+
+struct object3D *newCone(double ra, double rd, double rs, double rg, double r, double g,
+				double b, double alpha, double r_index, double shiny)
+{
+ // This is assumed to represent a unit cone with vertex at the origin.
+ // x^2+z^2-y^2=0
+ struct object3D *cone=(struct object3D *)calloc(1,sizeof(struct object3D));
+
+ if (!cone) fprintf(stderr,"Unable to allocate new cone, out of memory!\n");
+ else
+ {
+  cone->alb.ra=ra;
+  cone->alb.rd=rd;
+  cone->alb.rs=rs;
+  cone->alb.rg=rg;
+  cone->col.R=r;
+  cone->col.G=g;
+  cone->col.B=b;
+  cone->alpha=alpha;
+  cone->r_index=r_index;
+  cone->shinyness=shiny;
+  cone->intersect=&coneIntersect;
+  cone->texImg=NULL;
+  memcpy(&cone->T[0][0],&eye4x4[0][0],16*sizeof(double));
+  memcpy(&cone->Tinv[0][0],&eye4x4[0][0],16*sizeof(double));
+  cone->textureMap=&texMap;
+  cone->frontAndBack=1;
+  cone->isLightSource=0;
+  cone->isMirror=0;
+  cone->goingOut=0;
+  cone->left=NULL;
+  cone->right=NULL;
+ }
+ return(cone);
+}
+
+struct object3D *newParaboloid(double ra, double rd, double rs, double rg, double r, double g,
+				double b, double alpha, double r_index, double shiny)
+{
+ // This is assumed to represent a unit paraboloid with vertex at the origin.
+ // x^2+z^2+y=0
+ struct object3D *paraboloid=(struct object3D *)calloc(1,sizeof(struct object3D));
+
+ if (!paraboloid) fprintf(stderr,"Unable to allocate new paraboloid, out of memory!\n");
+ else
+ {
+  paraboloid->alb.ra=ra;
+  paraboloid->alb.rd=rd;
+  paraboloid->alb.rs=rs;
+  paraboloid->alb.rg=rg;
+  paraboloid->col.R=r;
+  paraboloid->col.G=g;
+  paraboloid->col.B=b;
+  paraboloid->alpha=alpha;
+  paraboloid->r_index=r_index;
+  paraboloid->shinyness=shiny;
+  paraboloid->intersect=&paraboloidIntersect;
+  paraboloid->texImg=NULL;
+  memcpy(&paraboloid->T[0][0],&eye4x4[0][0],16*sizeof(double));
+  memcpy(&paraboloid->Tinv[0][0],&eye4x4[0][0],16*sizeof(double));
+  paraboloid->textureMap=&texMap;
+  paraboloid->frontAndBack=1;
+  paraboloid->isLightSource=0;
+  paraboloid->isMirror=0;
+  paraboloid->goingOut=0;
+  paraboloid->left=NULL;
+  paraboloid->right=NULL;
+}
+ return(paraboloid);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -173,13 +252,19 @@ void planeIntersect(struct object3D *plane, struct ray3D *ray, double *lambda,
 	_n->py=0;
 	_n->pz=-1;
 	_n->pw=0;
+
+	if(plane->texImg!=NULL){
+	    *a = (_p->px+1.0)/2.0;
+	    *b = (_p->py+1.0)/2.0;
+	    //printf("%.3f %.3f   ",*a,*b);
+	}
     }
     //convert back the ray into the object world
     matRayMult(plane->T,ray);
 }
 
 void sphereIntersect(struct object3D *sphere, struct ray3D *ray, double *lambda, struct point3D *_p,
-					struct point3D *_n, double *a, double *b)
+					struct point3D *_n, double *u, double *v)
 {
     //transform the ray into Model world
     matRayMult(sphere->Tinv,ray);
@@ -204,6 +289,7 @@ void sphereIntersect(struct object3D *sphere, struct ray3D *ray, double *lambda,
 	    t = -B/(2*A);
 	}else{
 	    //2 roots
+	    //let t be the smaller root
 	    double t1,t2;
 	    delta = sqrt(delta);
 	    t1 = (-B-delta)/A;
@@ -212,14 +298,28 @@ void sphereIntersect(struct object3D *sphere, struct ray3D *ray, double *lambda,
 	    else t=t2/2;
 	}
 	if(t>0){
+	    //t is a positive (valid) root
 	    *lambda=t;
 	    ray->rayPos(ray, t, _p);
 	    _n->px=_p->px;
 	    _n->py=_p->py;
 	    _n->pz=_p->pz;
 	    _n->pw=0;
+
+	    //determine normal vector direction, i.e. towards the center or outwards
 	    if(dot(_n,&(ray->d))>0){
+		//the ray is shooting from inside the sphere to the world
 		multVector(-1.0,_n);
+		sphere->goingOut=1;
+	    }else
+		sphere->goingOut=0;
+
+	    //compute the texture (u,v) coordinates
+	    if(sphere->texImg != NULL && sphere->textureMap != NULL){
+		    //compute the radius
+		    double r = length(_p);
+		    *v = 1.0 - std::acos(_p->py/r)/PI;
+		    *u = 0.5 + std::atan2(_p->px,_p->pz)/(2.0*PI);
 	    }
 	}
     }
@@ -228,6 +328,140 @@ void sphereIntersect(struct object3D *sphere, struct ray3D *ray, double *lambda,
     matRayMult(sphere->T,ray);
 
 }
+
+
+
+void coneIntersect(struct object3D *cone, struct ray3D *ray, double *lambda, struct point3D *_p,
+					struct point3D *_n, double *u, double *v)
+{
+    //transform the ray into Model world
+    matRayMult(cone->Tinv,ray);
+
+    double A,B,C;
+    double px,py,pz,dx,dy,dz;
+    *lambda=-1;
+    px=ray->p0.px;
+    py=ray->p0.py;
+    pz=ray->p0.pz;
+    dx=ray->d.px;
+    dy=ray->d.py;
+    dz=ray->d.pz;
+ 
+    A = dx*dx-dy*dy+dz*dz;
+    B = (px*dx-py*dy+pz*dz)*2;
+    C = px*px-py*py+pz*pz;
+    double delta = B*B-4*A*C,t;
+    if(A!=0 && delta>=0){
+    	if(delta==0){
+	    //there is one root
+	    t = -B/(2*A);
+	}else{
+	    //2 roots
+	    //let t be the smaller root
+	    double t1,t2;
+	    delta = sqrt(delta);
+	    t1 = (-B-delta)/A;
+	    t2 = (-B+delta)/A;
+	    if(t1>0) t=t1/2;
+	    else t=t2/2;
+	}
+	if(t>0){
+	    //t is a positive (valid) root
+	    //now check the bound of y
+	    ray->rayPos(ray, t, _p);
+	    if(_p->py>=-1 && _p->py<=0){
+		    *lambda=t;
+		    _n->px=_p->px;
+		    _n->py=-_p->py;
+		    _n->pz=_p->pz;
+		    _n->pw=0;
+	
+		    //compute the texture (u,v) coordinates
+		    if(cone->texImg != NULL && cone->textureMap != NULL){
+			    //compute the radius
+			    double r = sqrt(_p->px*_p->px+_p->pz*_p->pz);
+			    *v = 1.0 + _p->py;
+			    *u = 0.5 + std::atan2(_p->px,_p->pz)/(2.0*PI);
+		    }
+	    }
+	}
+    }
+
+    //convert back the ray into the object world
+    matRayMult(cone->T,ray);
+}
+
+
+
+
+void paraboloidIntersect(struct object3D *paraboloid, struct ray3D *ray, double *lambda, struct point3D *_p,
+					struct point3D *_n, double *u, double *v)
+{
+    //transform the ray into Model world
+    matRayMult(paraboloid->Tinv,ray);
+
+    double A,B,C;
+    double px,py,pz,dx,dy,dz;
+    *lambda=-1;
+    px=ray->p0.px;
+    py=ray->p0.py;
+    pz=ray->p0.pz;
+    dx=ray->d.px;
+    dy=ray->d.py;
+    dz=ray->d.pz;
+ 
+    A = dx*dx+dz*dz;
+    B = (px*dx+pz*dz)*2+dy;
+    C = px*px+pz*pz+py;
+    double delta = B*B-4*A*C,t;
+    if(A!=0 && delta>=0){
+    	if(delta==0){
+	    //there is one root
+	    t = -B/(2*A);
+	}else{
+	    //2 roots
+	    //let t be the smaller root
+	    double t1,t2;
+	    delta = sqrt(delta);
+	    t1 = (-B-delta)/A;
+	    t2 = (-B+delta)/A;
+	    if(t1>0) t=t1/2;
+	    else t=t2/2;
+	}
+	if(t>0){
+	    //t is a positive (valid) root
+	    //now check the bound of y
+	    ray->rayPos(ray, t, _p);
+	    if(_p->py>=-1 && _p->py<=0){
+		    *lambda=t;
+		    _n->px=_p->px*2;
+		    _n->py=1.0;
+		    _n->pz=_p->pz*2;
+		    _n->pw=0;
+	
+		    //compute the texture (u,v) coordinates
+/*		    if(paraboloid->texImg != NULL && paraboloid->textureMap != NULL){
+			    //compute the radius
+			    double r = sqrt(_p->px*_p->px+_p->pz*_p->pz);
+			    *v = 1.0 + _p->py;
+			    *u = 0.5 + std::atan2(_p->px,_p->pz)/(2.0*PI);
+		    }
+*/
+	    }
+	}
+    }
+
+    //convert back the ray into the object world
+    matRayMult(paraboloid->T,ray);
+}
+
+
+
+
+
+
+
+
 
 void loadTexture(struct object3D *o, const char *filename)
 {
@@ -244,33 +478,50 @@ void loadTexture(struct object3D *o, const char *filename)
  }
 }
 
-void texMap(struct image *img, double a, double b, double *R, double *G, double *B)
+
+/*
+ Function to determine the colour of a textured object at
+ the normalized texture coordinates (u,v).
+
+ u and v are texture coordinates in [0 1].
+ img is a pointer to the image structure holding the texture for
+  a given object.
+
+ The colour is returned in R, G, B. Uses bi-linear interpolation
+ to determine texture colour.
+*/
+void texMap(struct image *img, double u, double v, double *R, double *G, double *B)
 {
- /*
-  Function to determine the colour of a textured object at
-  the normalized texture coordinates (a,b).
+    assert(u<1 && v<1 && u>=0 && v>=0);
+    if(!img || !(img->rgbdata)) return;
+    double* rgb = (double *)img->rgbdata;
+    double nx=img->sx;
+    double ny=img->sy;
+    double _u, _v, i, j;
+    double *c00, *c01, *c10, *c11;
 
-  a and b are texture coordinates in [0 1].
-  img is a pointer to the image structure holding the texture for
-   a given object.
+    i = floor(u*nx);
+    j = floor(v*ny);
+    _u = u*nx -i;
+    _v = v*ny -j;
 
-  The colour is returned in R, G, B. Uses bi-linear interpolation
-  to determine texture colour.
- */
+    c00 = (rgb+(int)i*3+(int)(j*nx)*3);
+    c10 = (rgb+(int)i*3+3+(int)(j*nx)*3);
+    //in case the last row
+    if(j==(ny-1)){
+	c01=c00;
+	c11=c10;
+    }else{
+    	c01 = (rgb+(int)i*3+(int)(j*nx)*3+(int)nx*3);
+       	c11 = (rgb+(int)i*3+3+(int)(j*nx)*3+(int)nx*3);
+    }
 
- //////////////////////////////////////////////////
- // TO DO (Assignment 4 only):
- //
- //  Complete this function to return the colour
- // of the texture image at the specified texture
- // coordinates. Your code should use bi-linear
- // interpolation to obtain the texture colour.
- //////////////////////////////////////////////////
-
- *(R)=0;	// Returns black - delete this and
- *(G)=0;	// replace with your code to compute
- *(B)=0;	// texture colour at (a,b)
- return;
+    *R = (1-_u)*(1-_v)*(*c00) + _u*(1-_v)*(*c10)
+	+(1-_u)*_v*(*c01) + _u*_v*(*c11);;
+    *G = (1-_u)*(1-_v)*(*(c00+1)) + _u*(1-_v)*(*(c10+1))
+	+(1-_u)*_v*(*(c01+1)) + _u*_v*(*(c11+1));;
+    *B = (1-_u)*(1-_v)*(*(c00+2)) + _u*(1-_v)*(*(c10+2))
+	+(1-_u)*_v*(*(c01+2)) + _u*_v*(*(c11+2));;
 }
 
 void insertObject(struct object3D *o, struct object3D **list)
@@ -750,7 +1001,6 @@ void imageOutput(struct image *im, const char *filename)
  //
 
  FILE *f;
-
  if (im!=NULL)
   if (im->rgbdata!=NULL)
   {
@@ -801,14 +1051,6 @@ void cleanup(struct object3D *o_list)
   free(p);
   p=q;
  }
-
-/*
- r=l_list;
- while(r!=NULL)
- {
-  s=r->next;
-  free(r);
-  r=s;
- }
-*/
 }
+
+
