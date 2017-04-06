@@ -92,8 +92,6 @@ struct object3D *newPlane(double ra, double rd, double rs, double rg, double r, 
   plane->isLightSource=0;
   plane->isMirror=0;
   plane->goingOut=0;
-  plane->left=NULL;
-  plane->right=NULL;
  }
  return(plane);
 }
@@ -136,8 +134,6 @@ struct object3D *newSphere(double ra, double rd, double rs, double rg, double r,
   sphere->isLightSource=0;
   sphere->isMirror=0;
   sphere->goingOut=0;
-  sphere->left=NULL;
-  sphere->right=NULL;
  }
  return(sphere);
 }
@@ -171,8 +167,6 @@ struct object3D *newCone(double ra, double rd, double rs, double rg, double r, d
   cone->isLightSource=0;
   cone->isMirror=0;
   cone->goingOut=0;
-  cone->left=NULL;
-  cone->right=NULL;
  }
  return(cone);
 }
@@ -206,11 +200,46 @@ struct object3D *newParaboloid(double ra, double rd, double rs, double rg, doubl
   paraboloid->isLightSource=0;
   paraboloid->isMirror=0;
   paraboloid->goingOut=0;
-  paraboloid->left=NULL;
-  paraboloid->right=NULL;
 }
  return(paraboloid);
 }
+
+
+
+
+struct object3D *newBox(double ra, double rd, double rs, double rg, double r, double g,
+				double b, double alpha, double r_index, double shiny)
+{
+ // This is assumed to represent a unit box with center at the origin.
+ // x=-1, x=1, y=-1, y=1, z=-1, z=1
+ struct object3D *box=(struct object3D *)calloc(1,sizeof(struct object3D));
+
+ if (!box) fprintf(stderr,"Unable to allocate new box, out of memory!\n");
+ else
+ {
+  box->alb.ra=ra;
+  box->alb.rd=rd;
+  box->alb.rs=rs;
+  box->alb.rg=rg;
+  box->col.R=r;
+  box->col.G=g;
+  box->col.B=b;
+  box->alpha=alpha;
+  box->r_index=r_index;
+  box->shinyness=shiny;
+  box->intersect=&boxIntersect;
+  box->texImg=NULL;
+  memcpy(&box->T[0][0],&eye4x4[0][0],16*sizeof(double));
+  memcpy(&box->Tinv[0][0],&eye4x4[0][0],16*sizeof(double));
+  box->textureMap=&texMap;
+  box->frontAndBack=0;
+  box->isLightSource=0;
+  box->isMirror=0;
+  box->goingOut=0;
+}
+ return(box);
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //	Complete the functions that compute intersections for the canonical plane (Model world)
@@ -458,7 +487,134 @@ void paraboloidIntersect(struct object3D *paraboloid, struct ray3D *ray, double 
 
 
 
+void boxIntersect(struct object3D *box, struct ray3D *ray, double *lambda, struct point3D *_p,
+					struct point3D *_n, double *u, double *v)
+{
+    //transform the ray into Model world
+    matRayMult(box->Tinv,ray);
 
+    double px,py,pz,dx,dy,dz,txy,tzy,tzx;
+    *lambda=-1;
+    txy=-1;
+    tzy=-1;
+    tzx=-1;
+    px=ray->p0.px;
+    py=ray->p0.py;
+    pz=ray->p0.pz;
+    dx=ray->d.px;
+    dy=ray->d.py;
+    dz=ray->d.pz;
+    memset(_n,0,sizeof(struct point3D));
+ 
+    //xy plane
+    //if no valid txy, txy<=0
+    if(dz!=0){
+	struct point3D p1,p2;
+	double t1,t2;
+	t1=(1-pz)/dz;
+	t2=(-1-pz)/dz; 
+	//note t2 < t1 always
+	if(t2<=0) txy=t1;
+	else{
+    	    rayPosition(ray,t2,&p2);
+	    if(p2.px<=1 && p2.px>=-1 &&
+		p2.py<=1 && p2.py>=-1)
+		    txy=t2;
+	    else
+		txy=t1;
+	}
+	if(txy==t1){
+	    if(t1>0){
+    		rayPosition(ray,t1,&p1);
+		if(p1.px>1 || p1.px<-1 ||
+		    p1.py>1 || p1.py<-1)
+			txy=-1;
+	    }
+	}
+    }
+    //zy plane
+    //if no valid tzy, tzy<=0
+    if(dx!=0){
+	struct point3D p1,p2;
+	double t1,t2;
+	t1=(1-px)/dx;
+	t2=(-1-px)/dx;
+	if(t2<0) tzy=t1;
+	else{
+	    rayPosition(ray,t2,&p2);
+	    if(p2.py<=1 && p2.py>=-1 &&
+		p2.pz<=1 && p2.pz>=-1)
+		    tzy=t2;
+	    else tzy=t1;
+
+	}
+	if(tzy==t1){
+	    if(t1>0){
+    		rayPosition(ray,t1,&p1);
+		if(p1.pz>1 || p1.pz<-1 ||
+		    p1.py>1 || p1.py<-1)
+			tzy=-1;
+	    }
+	}
+    }
+    //zx plane
+    //if no valid tzx, tzx<=0
+    if(dy!=0){
+	struct point3D p1,p2;
+	double t1,t2;
+	t1=(1-py)/dy;
+	t2=(-1-py)/dy; 
+	//note t2 < t1 always
+	if(t2<=0) tzx=t1;
+	else{
+    	    rayPosition(ray,t2,&p2);
+	    if(p2.px<=1 && p2.px>=-1 &&
+		p2.pz<=1 && p2.pz>=-1)
+		    tzx=t2;
+	    else
+		tzx=t1;
+	}
+	if(tzx==t1){
+	    if(t1>0){
+    		rayPosition(ray,t1,&p1);
+		if(p1.px>1 || p1.px<-1 ||
+		    p1.pz>1 || p1.pz<-1)
+			tzx=-1;
+	    }
+	}
+    }
+
+    double tmin=-1;
+    if(txy>0) tmin=txy;
+    else if(tzy>0) tmin=tzy;
+    else if(tzx>0) tmin=tzx;
+    else return;
+
+    if(tzy>0 && tzy<tmin) tmin=tzy;
+    if(tzx>0 && tzx<tmin) tmin=tzx;
+
+
+    //if reach here, we have a valid min root
+    assert(tmin>0);
+    *lambda=tmin;
+    rayPosition(ray,tmin,_p);
+
+    //set normal vectors
+    if(tmin==txy){
+	if(_p->pz>0) _n->pz=1;
+	else _n->pz=-1;
+    }else if(tmin==tzy){
+	if(_p->px>0) _n->px=1;
+	else _n->px=-1;
+    }else{
+	assert(tmin==tzx);
+	if(_p->py>0) _n->py=1;
+	else _n->py=-1;
+    }
+
+    //convert back the ray into the object world
+    matRayMult(box->T,ray);
+}
 
 
 

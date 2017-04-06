@@ -22,7 +22,7 @@
 #include "assert.h"
 #define maxlight 10
 //#define DEBUGTEXT
-//#define DEBUGRGB
+#define DEBUGRGB
 
 // A couple of global structures and data: An object list, a light list, and the
 // maximum recursion depth
@@ -49,6 +49,57 @@ void gen_Gaussian_weight(double *table,int center){
 	}
     }
 }
+
+
+//accumulate the top transformation ONE level down to its children
+void setChildT(struct object3D* top){
+ struct object3D* cur = top->children;
+ while(cur!=NULL){
+    matMult(top->T,cur->T);
+    invert(&cur->T[0][0],&cur->Tinv[0][0]);
+ }
+}
+
+
+//The top level object is a bounding box that holds all parts, which is returned.
+//User can apply transformations directly onto this box object, which will be
+//accumulated to its child nodes by calling setChildT(obj);.
+struct object3D* buildAvator(void){
+ 
+ struct object3D *top, *o;
+
+ top=newBox(1,1,1,1,1,1,1,1,1,10); //top level bounding box
+ invert(&top->T[0][0],&top->Tinv[0][0]);
+ insertObject(top,&object_list);
+
+ //an opague cone (crown)
+ o=newCone(.2,.8,.1,.8,.8,.8,1,1,1.52,10);
+ RotateZ(o,PI/8);
+ Translate(o,0,5,-2);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ //insert this object into the boudning box object list
+ insertObject(o,&(top->children));
+
+ //an opague refractive sphere (head)
+ o=newSphere(.2,.95,.95,1,.94,.5,.5,1,1.52,10);
+ Translate(o,0,4,-2);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&(top->children));
+
+
+ //an opague paraboloid (body)
+ o=newParaboloid(.2,.5,.1,.3,.8,.8,1,1,1.52,10);
+ Translate(o,0,1.5,-2);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&(top->children));
+
+ //legs
+
+ return o;
+}
+
+
+
 void buildScene(void)
 {
  // Sets up all objects in the scene. This involves creating each object,
@@ -121,12 +172,6 @@ void buildScene(void)
  invert(&o->T[0][0],&o->Tinv[0][0]);	
  insertObject(o,&object_list);		
 
- //an opague refractive sphere
- o=newSphere(.2,.95,.95,1,.94,.5,.5,1,1.52,10);
- Translate(o,-1,-.5,1);
- invert(&o->T[0][0],&o->Tinv[0][0]);
- insertObject(o,&object_list);
-
 /* //an transparent plane
  o=newPlane(.05,.1,.7,1,1,1,1,.5,1.5,2);
  Translate(o,-1,1.5,-1);
@@ -134,22 +179,17 @@ void buildScene(void)
  insertObject(o,&object_list);
 */
 
- //an opague cone (head)
- o=newCone(.2,.5,.8,.8,.8,.8,1,1,1.52,10);
- Translate(o,-3,0,-2);
- invert(&o->T[0][0],&o->Tinv[0][0]);
- insertObject(o,&object_list);
-
- //an opague paraboloid
- o=newParaboloid(.2,.5,.1,.3,.8,.8,1,1,1.52,10);
- Translate(o,0,-2,-2);
- invert(&o->T[0][0],&o->Tinv[0][0]);
- insertObject(o,&object_list);
-
  //an transparent sphere
  o=newSphere(.1,.1,.6,.8,1,1,1,.2,1.42,10);
  Scale(o,1.3,1.3,1.3);
  Translate(o,0,3,1);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+
+
+ o=newBox(.3,.95,.95,.5,.94,.5,.5,1,1.52,10);
+ Scale(o,.5,.5,.5);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
@@ -160,6 +200,7 @@ void buildScene(void)
  Translate(o,-1.9,0,1);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
+
  //an opaque plane
  o=newPlane(.05,.75,.05,1,.8,.5,.3,1,1,10);
  Scale(o,3.3,2.5,1);
@@ -242,23 +283,8 @@ int main(int argc, char *argv[])
  }
  else rgbIm=(unsigned char *)im->rgbdata; //Fan: char *rgb[im->sx][im->sy][3]
 
- ///////////////////////////////////////////////////
- // TO DO: You will need to implement several of the
- //        functions below. For Assignment 3, you can use
- //        the simple scene already provided. But
- //        for Assignment 4 you need to create your own
- //        *interesting* scene.
- ///////////////////////////////////////////////////
  buildScene();		// Create a scene. This defines all the
 			// objects in the world of the raytracer
-
- //////////////////////////////////////////
- // TO DO: For Assignment 3 you can use the setup
- //        already provided here. For Assignment 4
- //        you may want to move the camera
- //        and change the view parameters
- //        to suit your scene.
- //////////////////////////////////////////
 
  // Mind the homogeneous coordinate w of all vectors below. DO NOT
  // forget to set it to 1, or you'll get junk out of the
@@ -274,7 +300,7 @@ int main(int argc, char *argv[])
  // the camera is looking at, and do the vector subtraction pc-e.
  // Here we set up the camera to be looking at the origin, so g=(0,0,0)-(0,0,-1)
  g.px=0;
- g.py=-2;
+ g.py=-5;
  g.pz=10;
  g.pw=0;
  normalize(&g);
@@ -394,9 +420,9 @@ debugUV=fopen("uv.txt","wb+");
 
  #ifdef DEBUGRGB
     fprintf(debugRGB,"(%d %d %d) ",(int)(col_avg.R*255),(int)(col_avg.G*255),(int)(col_avg.B*255));
-/*    if(col_avg.R*255>=100)
+/*    if(j>200 && col_avg.R*255<10)
 	printf("wrong!\n");
-	*/
+*/	
  #endif
 
   } // end of this row

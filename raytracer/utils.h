@@ -212,8 +212,8 @@ struct object3D *newCone(double ra, double rd, double rs, double rg, double r, d
 				double b, double alpha, double r_index, double shiny);
 struct object3D *newParaboloid(double ra, double rd, double rs, double rg, double r, double g,
 				double b, double alpha, double r_index, double shiny);
-
-
+struct object3D *newBox(double ra, double rd, double rs, double rg, double r, double g,
+				double b, double alpha, double r_index, double shiny);
 
 // Functions to compute intersections for objects.
 // You'll need to add code for these in utils.c
@@ -222,6 +222,8 @@ void sphereIntersect(struct object3D *sphere, struct ray3D *r, double *lambda, s
 void coneIntersect(struct object3D *cone, struct ray3D *ray, double *lambda, struct point3D *_p,
 					struct point3D *_n, double *u, double *v);
 void paraboloidIntersect(struct object3D *paraboloid, struct ray3D *ray, double *lambda, struct point3D *_p,
+					struct point3D *_n, double *u, double *v);
+void boxIntersect(struct object3D *box, struct ray3D *ray, double *lambda, struct point3D *_p,
 					struct point3D *_n, double *u, double *v);
 
 

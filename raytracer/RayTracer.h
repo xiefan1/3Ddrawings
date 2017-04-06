@@ -144,8 +144,7 @@ struct object3D{
 	int goingOut; //flag to indicate: 1 -- ray is shooting from inside of the object to the world
 			//this flag is set by intersect function
 	struct object3D *next;	// Pointer to next entry in object linked list
-	struct object3D *left;  //Bounding volume hierarchy Binary tree
-	struct object3D *right;
+	struct object3D *children;  //Bounding volume hierarchy: using linked list
 };
 
 
@@ -180,5 +179,11 @@ void bgMap(struct ray3D* ray, struct colourRGB* col);
 void gen_Gaussian_weight(double *table,int size);
 struct ray3D* gen_refractionRay(struct object3D* obj, struct point3D* n, struct point3D* b, struct point3D* p);
 struct ray3D* gen_reflectionRay(struct point3D* n, struct point3D* b, struct point3D* p);
+
+//Compact objects
+//this function accumulates the top transformation ONE level down to its children
+void setChildT(struct object3D* top);
+struct object3D* buildAvator(void);
+
 
 #endif
