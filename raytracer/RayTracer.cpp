@@ -22,7 +22,7 @@
 #include "assert.h"
 #define maxlight 10
 //#define DEBUGTEXT
-#define DEBUGRGB
+//#define DEBUGRGB
 
 // A couple of global structures and data: An object list, a light list, and the
 // maximum recursion depth
@@ -55,6 +55,12 @@ void gen_Gaussian_weight(double *table,int center){
 void setChildT(struct object3D* top){
  struct object3D* cur = top->children;
  while(cur!=NULL){
+/*    double tempT[4][4];
+    memcpy(tempT,top->T,sizeof(double)*4*4);
+    matMult(cur->T,tempT);
+    memcpy(cur->T,tempT,sizeof(double)*4*4);
+*/
+
     matMult(top->T,cur->T);
     invert(&cur->T[0][0],&cur->Tinv[0][0]);
  }
@@ -72,30 +78,55 @@ struct object3D* buildAvator(void){
  invert(&top->T[0][0],&top->Tinv[0][0]);
  insertObject(top,&object_list);
 
+
+
+
+
+
  //an opague cone (crown)
  o=newCone(.2,.8,.1,.8,.8,.8,1,1,1.52,10);
+ Scale(o,.5,1.8,.5);
  RotateZ(o,PI/8);
  Translate(o,0,5,-2);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  //insert this object into the boudning box object list
+ //insertObject(o,&object_list);
  insertObject(o,&(top->children));
 
  //an opague refractive sphere (head)
  o=newSphere(.2,.95,.95,1,.94,.5,.5,1,1.52,10);
- Translate(o,0,4,-2);
+ Scale(o,.5,.5,.5);
+ Translate(o,3,0,-2);
  invert(&o->T[0][0],&o->Tinv[0][0]);
+// insertObject(o,&object_list);
  insertObject(o,&(top->children));
 
 
  //an opague paraboloid (body)
  o=newParaboloid(.2,.5,.1,.3,.8,.8,1,1,1.52,10);
- Translate(o,0,1.5,-2);
+ Scale(o,1.5,2.5,1.5);
+ RotateZ(o,-PI/12);
+ Translate(o,-3,2.5,-2);
  invert(&o->T[0][0],&o->Tinv[0][0]);
+ //insertObject(o,&object_list);
  insertObject(o,&(top->children));
+
+
+
+
+
+
+
+
+
+
+
+
+
 
  //legs
 
- return o;
+ return top;
 }
 
 
@@ -120,9 +151,10 @@ void buildScene(void)
 
  //set up the backgroud as a huge sphere
  backgroundObj = newSphere(0,0,0,0,0,0,0,0,0,0);
- Scale(backgroundObj,20,10,20);
+ Scale(backgroundObj,40,20,40);
  invert(&backgroundObj->T[0][0],&backgroundObj->Tinv[0][0]);
  //loadTexture(backgroundObj,"texture/starSphere.ppm");
+ //loadTexture(backgroundObj,"texture/longx.ppm");
 
 
  struct object3D *o;
@@ -134,8 +166,8 @@ void buildScene(void)
 						// Colour is close to cyan, and currently the plane is
 						// completely opaque (alpha=1). The refraction index is
 						// meaningless since alpha=1
-// Scale(o,10,10,1);				// Do a few transforms...
- Scale(o,40,60,1);				// Do a few transforms...
+ Scale(o,16,10,1);				// Do a few transforms...
+// Scale(o,20,10,20);				// Do a few transforms...
  RotateZ(o,PI/1.20);
  RotateX(o,PI/2.25);
  Translate(o,0,-3,10);
@@ -165,7 +197,7 @@ void buildScene(void)
  //a mirror
  o=newPlane(.05,.75,.05,1,1,1,1,1,1,2);
  o->isMirror = 1; 			//for mirror, specify all rgb to 1,1,1
- Scale(o,3.3,2.5,1);
+ Scale(o,2.3,2.5,1);
  RotateY(o,PI/3.5);
  RotateZ(o,-PI/19);
  Translate(o,3,-1,3);
@@ -188,11 +220,62 @@ void buildScene(void)
 
 
 
- o=newBox(.3,.95,.95,.5,.94,.5,.5,1,1.52,10);
+ o=newBox(.2,.95,.95,.5,.94,.5,.5,1,1.52,10);
  Scale(o,.5,.5,.5);
+ Translate(o,3,3,-1);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
+
+
+
+
+
+
+
+/*
+ //an opague cone (crown)
+ o=newCone(.2,.8,.1,.8,.8,.8,1,1,1.52,10);
+ Scale(o,.5,1.8,.5);
+ RotateZ(o,PI/8);
+ Translate(o,0,5,-2);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ //insert this object into the boudning box object list
+ insertObject(o,&object_list);
+
+ //an opague refractive sphere (head)
+ o=newSphere(.2,.95,.95,1,.94,.5,.5,1,1.52,10);
+ Scale(o,.5,.5,.5);
+ Translate(o,3,0,-2);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+
+ //an opague paraboloid (body)
+ o=newParaboloid(.2,.5,.1,.3,.8,.8,1,1,1.52,10);
+ Scale(o,1.5,2.5,1.5);
+ RotateZ(o,-PI/12);
+ Translate(o,-3,2.5,-2);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ o=buildAvator();
+ //setChildT(o);
 
 /*
  //an opague refractive sphere
@@ -300,7 +383,7 @@ int main(int argc, char *argv[])
  // the camera is looking at, and do the vector subtraction pc-e.
  // Here we set up the camera to be looking at the origin, so g=(0,0,0)-(0,0,-1)
  g.px=0;
- g.py=-5;
+ g.py=-2;
  g.pz=10;
  g.pw=0;
  normalize(&g);
@@ -464,7 +547,7 @@ debugUV=fopen("uv.txt","wb+");
 // note: ray is in the world coords
 void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
 		  	struct object3D **obj, struct point3D *p, 
-			struct point3D *n, double *a, double *b, int depth){
+			struct point3D *n, double *a, double *b, int depth, struct object3D *topBox){
     *lambda = -1;
     *obj = NULL;
     int initial=1;
@@ -473,7 +556,20 @@ void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
     double _a,_b;
 
     struct object3D *cur_obj=object_list;
+    struct object3D *child_list=NULL;
+    if(topBox) child_list=topBox->children;
+
     while(cur_obj!=NULL){
+	if(topBox)
+	    if(cur_obj==topBox){
+		if(cur_obj->next==NULL){
+		    cur_obj=child_list;
+		    child_list=NULL;
+		}
+		else cur_obj=cur_obj->next;
+
+		continue;
+	    }
 
 	cur_obj->intersect(cur_obj,ray,&temp,&_p,&_n,&_a,&_b);
 
@@ -503,7 +599,13 @@ void findFirstHit(struct ray3D *ray, double *lambda, struct object3D *Os,
 	    }
 	}
 
-	cur_obj=cur_obj->next;
+	if(cur_obj->next==NULL){
+    	    cur_obj=child_list;;
+	    child_list=NULL;
+	}
+	else{
+	    cur_obj=cur_obj->next;;
+	}
     }
 }
 
@@ -598,26 +700,43 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
 	double lambda=0, a=0,b=0; //a,b are texture coords
     	struct object3D* hitObj=NULL;
         struct point3D p,n;
+	int background=0;
         //find the first intersection
         //return lambda, hit object(next object source), hit point and normal
-        findFirstHit(ray,&lambda,Os,&hitObj,&p,&n,&a,&b,depth);
+        findFirstHit(ray,&lambda,Os,&hitObj,&p,&n,&a,&b,depth,NULL);
 
-	//color shading
         if(hitObj){
             //if hit an object
-	    //Phong illumination
-	    rtShade(hitObj,&p,&n,ray,depth,a,b,col);
+	    //check if this is a bounding box
+	    //then draw the leaves only
+	    if(hitObj->children!=NULL){
+		struct object3D* top = hitObj;
+		hitObj=NULL;
+		findFirstHit(ray,&lambda,Os,&hitObj,&p,&n,&a,&b,depth,top);
+		if(hitObj)
+		    printf("hit something in the box\n");
+	    }
 
-	    #ifdef DEBUGTEXT
+
+	    //Phong illumination
+	    if(hitObj)
+		rtShade(hitObj,&p,&n,ray,depth,a,b,col);
+	    else 
+		background=1;
+
+/*	    #ifdef DEBUGTEXT
 	    if(hitObj->texImg){
 		fprintf(debugUV,"%.3f %.3f    ",a,b);
 	    }
 	    #endif
-	}else{
+*/
+	}else
+	    background=1;
+
+	if(background && backgroundObj->texImg!=NULL){
 	    //environment mapping
 	    //get color from the background
-	    if(backgroundObj->texImg!=NULL)
-    		bgMap(ray,col);
+	    bgMap(ray,col);
 	}
 }
 
@@ -626,7 +745,11 @@ void bgMap(struct ray3D* ray, struct colourRGB* col){
 	struct point3D _n,_p;
 	double u,v;
 	backgroundObj->intersect(backgroundObj,ray,&t,&_p,&_n,&u,&v);
-	assert(u>=0 && u<1 && v>=0 && v<1);
+	if(u<0) u=0;
+	else if(u>1) u=1;
+	if(v<0) v=0;
+	else if(v>1) v=1;
+	///assert(u>=0 && u<1 && v>=0 && v<1);
 	//fill in col with the texture RGB colour
 	backgroundObj->textureMap(backgroundObj->texImg,u,v,&col->R,&col->G,&col->B);
 }
@@ -646,6 +769,8 @@ void bgMap(struct ray3D* ray, struct colourRGB* col){
 void rtShade(struct object3D *obj, struct point3D *p, struct point3D *n, struct ray3D *ray,
 				int depth, double _a, double _b, struct colourRGB *col)
 {
+if(!obj) return;
+
 //ray shoot on the back face 
 int backface = 0;
 if(dot(n,&ray->d)>=0)
@@ -794,7 +919,7 @@ if(dot(n,&ray->d)>=0)
             double shadow_t=0, a_temp, b_temp;
             struct object3D* hitObj=NULL;
             struct point3D _p,_n;
-            findFirstHit(ray_to_light,&shadow_t,obj,&hitObj,&_p,&_n,&a_temp,&b_temp,depth);
+            findFirstHit(ray_to_light,&shadow_t,obj,&hitObj,&_p,&_n,&a_temp,&b_temp,depth,NULL);
             free(ray_to_light);
             ray_to_light=NULL;
            

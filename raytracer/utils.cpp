@@ -648,7 +648,7 @@ void loadTexture(struct object3D *o, const char *filename)
 */
 void texMap(struct image *img, double u, double v, double *R, double *G, double *B)
 {
-    assert(u<1 && v<1 && u>=0 && v>=0);
+    assert(u<=1 && v<=1 && u>=0 && v>=0);
     if(!img || !(img->rgbdata)) return;
     double* rgb = (double *)img->rgbdata;
     double nx=img->sx;
@@ -1203,6 +1203,9 @@ void cleanup(struct object3D *o_list)
   {
    if (p->texImg->rgbdata!=NULL) free(p->texImg->rgbdata);
    free(p->texImg);
+  }
+  if(p->children!=NULL){
+    cleanup(p->children);
   }
   free(p);
   p=q;
