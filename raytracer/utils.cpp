@@ -282,7 +282,7 @@ void planeIntersect(struct object3D *plane, struct ray3D *ray, double *lambda,
 	_n->pz=-1;
 	_n->pw=0;
 
-	if(plane->texImg!=NULL){
+	if( a && b && plane->texImg!=NULL){
 	    *a = (_p->px+1.0)/2.0;
 	    *b = (_p->py+1.0)/2.0;
 	    //printf("%.3f %.3f   ",*a,*b);
@@ -344,7 +344,7 @@ void sphereIntersect(struct object3D *sphere, struct ray3D *ray, double *lambda,
 		sphere->goingOut=0;
 
 	    //compute the texture (u,v) coordinates
-	    if(sphere->texImg != NULL && sphere->textureMap != NULL){
+	    if(u && v && sphere->texImg != NULL && sphere->textureMap != NULL){
 		    //compute the radius
 		    double r = length(_p);
 		    *v = 1.0 - std::acos(_p->py/r)/PI;
@@ -405,8 +405,15 @@ void coneIntersect(struct object3D *cone, struct ray3D *ray, double *lambda, str
 		    _n->pz=_p->pz;
 		    _n->pw=0;
 	
+		    if(dot(_n,&(ray->d))>0){
+			//the ray is shooting from inside the sphere to the world
+			multVector(-1.0,_n);
+			cone->goingOut=1;
+		    }else
+			cone->goingOut=0;
+
 		    //compute the texture (u,v) coordinates
-		    if(cone->texImg != NULL && cone->textureMap != NULL){
+		    if( u && v && cone->texImg != NULL && cone->textureMap != NULL){
 			    //compute the radius
 			    double r = sqrt(_p->px*_p->px+_p->pz*_p->pz);
 			    *v = 1.0 + _p->py;
@@ -468,6 +475,13 @@ void paraboloidIntersect(struct object3D *paraboloid, struct ray3D *ray, double 
 		    _n->pz=_p->pz*2;
 		    _n->pw=0;
 	
+		    if(dot(_n,&(ray->d))>0){
+			//the ray is shooting from inside the sphere to the world
+			multVector(-1.0,_n);
+			paraboloid->goingOut=1;
+		    }else
+			paraboloid->goingOut=0;
+
 		    //compute the texture (u,v) coordinates
 /*		    if(paraboloid->texImg != NULL && paraboloid->textureMap != NULL){
 			    //compute the radius
@@ -516,7 +530,7 @@ void boxIntersect(struct object3D *box, struct ray3D *ray, double *lambda, struc
 	//note t2 < t1 always
 	if(t2<=0) txy=t1;
 	else{
-    	    rayPosition(ray,t2,&p2);
+    	    ray->rayPos(ray,t2,&p2);
 	    if(p2.px<=1 && p2.px>=-1 &&
 		p2.py<=1 && p2.py>=-1)
 		    txy=t2;
@@ -525,7 +539,7 @@ void boxIntersect(struct object3D *box, struct ray3D *ray, double *lambda, struc
 	}
 	if(txy==t1){
 	    if(t1>0){
-    		rayPosition(ray,t1,&p1);
+    		ray->rayPos(ray,t1,&p1);
 		if(p1.px>1 || p1.px<-1 ||
 		    p1.py>1 || p1.py<-1)
 			txy=-1;
@@ -541,7 +555,7 @@ void boxIntersect(struct object3D *box, struct ray3D *ray, double *lambda, struc
 	t2=(-1-px)/dx;
 	if(t2<0) tzy=t1;
 	else{
-	    rayPosition(ray,t2,&p2);
+	    ray->rayPos(ray,t2,&p2);
 	    if(p2.py<=1 && p2.py>=-1 &&
 		p2.pz<=1 && p2.pz>=-1)
 		    tzy=t2;
@@ -550,7 +564,7 @@ void boxIntersect(struct object3D *box, struct ray3D *ray, double *lambda, struc
 	}
 	if(tzy==t1){
 	    if(t1>0){
-    		rayPosition(ray,t1,&p1);
+    		ray->rayPos(ray,t1,&p1);
 		if(p1.pz>1 || p1.pz<-1 ||
 		    p1.py>1 || p1.py<-1)
 			tzy=-1;
@@ -567,7 +581,7 @@ void boxIntersect(struct object3D *box, struct ray3D *ray, double *lambda, struc
 	//note t2 < t1 always
 	if(t2<=0) tzx=t1;
 	else{
-    	    rayPosition(ray,t2,&p2);
+    	    ray->rayPos(ray,t2,&p2);
 	    if(p2.px<=1 && p2.px>=-1 &&
 		p2.pz<=1 && p2.pz>=-1)
 		    tzx=t2;
@@ -576,7 +590,7 @@ void boxIntersect(struct object3D *box, struct ray3D *ray, double *lambda, struc
 	}
 	if(tzx==t1){
 	    if(t1>0){
-    		rayPosition(ray,t1,&p1);
+    		ray->rayPos(ray,t1,&p1);
 		if(p1.px>1 || p1.px<-1 ||
 		    p1.pz>1 || p1.pz<-1)
 			tzx=-1;
@@ -588,7 +602,10 @@ void boxIntersect(struct object3D *box, struct ray3D *ray, double *lambda, struc
     if(txy>0) tmin=txy;
     else if(tzy>0) tmin=tzy;
     else if(tzx>0) tmin=tzx;
-    else return;
+    else{
+	matRayMult(box->T,ray);
+	return;
+    }
 
     if(tzy>0 && tzy<tmin) tmin=tzy;
     if(tzx>0 && tzx<tmin) tmin=tzx;
@@ -597,20 +614,41 @@ void boxIntersect(struct object3D *box, struct ray3D *ray, double *lambda, struc
     //if reach here, we have a valid min root
     assert(tmin>0);
     *lambda=tmin;
-    rayPosition(ray,tmin,_p);
+    ray->rayPos(ray,tmin,_p);
 
     //set normal vectors
     if(tmin==txy){
 	if(_p->pz>0) _n->pz=1;
 	else _n->pz=-1;
+	if(u && v && box->texImg!=NULL){
+	    *u = _p->px/2+0.5;
+	    *v = _p->py/2+0.5;
+	}
     }else if(tmin==tzy){
 	if(_p->px>0) _n->px=1;
 	else _n->px=-1;
+
+	if(u && v && box->texImg!=NULL){
+	    *u = _p->pz/2+0.5;
+	    *v = _p->py/2+0.5;
+	}
     }else{
 	assert(tmin==tzx);
 	if(_p->py>0) _n->py=1;
 	else _n->py=-1;
-    }
+
+    	if(u && v && box->texImg!=NULL){
+	    *u = _p->px/2+0.5;
+	    *v = _p->pz/2+0.5;
+	}
+}
+
+    if(dot(_n,&(ray->d))>0){
+	//the ray is shooting from inside the sphere to the world
+	multVector(-1.0,_n);
+	box->goingOut=1;
+    }else
+	box->goingOut=0;
 
     //convert back the ray into the object world
     matRayMult(box->T,ray);

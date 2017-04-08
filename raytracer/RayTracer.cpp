@@ -29,6 +29,7 @@
 struct object3D *object_list;
 struct object3D *light_list;
 double light_radius[maxlight];
+int numLight;
 struct object3D *backgroundObj;
 int MAX_DEPTH;
 int antialiasing;	// Flag to determine whether antialiaing is enabled or disabled
@@ -51,82 +52,94 @@ void gen_Gaussian_weight(double *table,int center){
 }
 
 
-//accumulate the top transformation ONE level down to its children
-void setChildT(struct object3D* top){
- struct object3D* cur = top->children;
- while(cur!=NULL){
-/*    double tempT[4][4];
-    memcpy(tempT,top->T,sizeof(double)*4*4);
-    matMult(cur->T,tempT);
-    memcpy(cur->T,tempT,sizeof(double)*4*4);
-*/
-
-    matMult(top->T,cur->T);
-    invert(&cur->T[0][0],&cur->Tinv[0][0]);
- }
-}
-
 
 //The top level object is a bounding box that holds all parts, which is returned.
 //User can apply transformations directly onto this box object, which will be
 //accumulated to its child nodes by calling setChildT(obj);.
 struct object3D* buildAvator(void){
  
- struct object3D *top, *o;
+/* struct object3D *top, *o;
 
  top=newBox(1,1,1,1,1,1,1,1,1,10); //top level bounding box
  invert(&top->T[0][0],&top->Tinv[0][0]);
  insertObject(top,&object_list);
+*/
 
-
-
-
-
-
+ struct object3D *o;
  //an opague cone (crown)
- o=newCone(.2,.8,.1,.8,.8,.8,1,1,1.52,10);
- Scale(o,.5,1.8,.5);
- RotateZ(o,PI/8);
- Translate(o,0,5,-2);
+ o=newCone(.4,.8,.1,.8,.94,.5,.5,1,1.52,10);
+ Scale(o,.4,1.8,.4);
+ RotateZ(o,PI/5);
+ Translate(o,-5.3,2.3,-3.5);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  //insert this object into the boudning box object list
- //insertObject(o,&object_list);
- insertObject(o,&(top->children));
+ //insertObject(o,&(top->children));
+ insertObject(o,&object_list);
 
  //an opague refractive sphere (head)
- o=newSphere(.2,.95,.95,1,.94,.5,.5,1,1.52,10);
+ o=newSphere(.4,.8,.05,.8,.94,.5,.5,1,1.52,10);
  Scale(o,.5,.5,.5);
- Translate(o,3,0,-2);
+ Translate(o,-4,.5,-3.5);
  invert(&o->T[0][0],&o->Tinv[0][0]);
-// insertObject(o,&object_list);
- insertObject(o,&(top->children));
+ //insertObject(o,&(top->children));
+ insertObject(o,&object_list);
 
 
  //an opague paraboloid (body)
- o=newParaboloid(.2,.5,.1,.3,.8,.8,1,1,1.52,10);
- Scale(o,1.5,2.5,1.5);
+ o=newParaboloid(.4,.8,.1,.9,.94,.5,.5,.4,1.52,10);
+ Scale(o,1,2,1);
  RotateZ(o,-PI/12);
- Translate(o,-3,2.5,-2);
+ Translate(o,-4,-.1,-3.5);
  invert(&o->T[0][0],&o->Tinv[0][0]);
- //insertObject(o,&object_list);
- insertObject(o,&(top->children));
-
-
-
-
-
-
-
-
-
-
-
-
+// insertObject(o,&(top->children));
+ insertObject(o,&object_list);
 
 
  //legs
 
- return top;
+// return top;
+return NULL;
+}
+
+void buildBuilding(){
+
+ struct object3D *top,*o;
+
+ //top left coord
+ double bx,by,bz;
+ bx=2;
+ by=3;
+ bz=-1.5;
+ //bounding box
+ top=newBox(.2,.95,.95,.5,.94,.5,.5,1,1.52,10);
+ Scale(top,2.5,2.5,2);
+ Translate(top,bx,by,bz);
+ invert(&top->T[0][0],&top->Tinv[0][0]);
+ insertObject(top,&object_list);
+
+
+ int dimension=3;
+ for(int j=0;j<dimension;++j){
+     for(int i=0;i<dimension;++i){
+        o=newBox(.1,.1,.2,.8,1,1,1,.5,1.4,10);
+        Scale(o,.2,.2,1);
+//	RotateY(o,PI/4);
+//	RotateZ(o,PI/10.0);
+        Translate(o,(bx+i),(by-(double)j*0.8),bz);
+        invert(&o->T[0][0],&o->Tinv[0][0]);
+        insertObject(o,&(top->children));
+
+	if(j<dimension-1){
+            o=newBox(.3,.15,.2,.6,1,1,1,.5,1.4,10);
+            Scale(o,.2,.2,1.5);
+	    RotateY(o,PI/2);
+//	    RotateZ(o,PI/10.0);
+            Translate(o,bx+1,(by-0.4-(double)j*0.8),bz-0.8+i);
+            invert(&o->T[0][0],&o->Tinv[0][0]);
+            insertObject(o,&(top->children));
+	}
+     }
+ } 
 }
 
 
@@ -151,161 +164,158 @@ void buildScene(void)
 
  //set up the backgroud as a huge sphere
  backgroundObj = newSphere(0,0,0,0,0,0,0,0,0,0);
- Scale(backgroundObj,40,20,40);
+ Scale(backgroundObj,15,30,30);
+ RotateZ(backgroundObj,PI/2);
  invert(&backgroundObj->T[0][0],&backgroundObj->Tinv[0][0]);
  //loadTexture(backgroundObj,"texture/starSphere.ppm");
- //loadTexture(backgroundObj,"texture/longx.ppm");
+ loadTexture(backgroundObj,"texture/space.ppm");
 
 
  struct object3D *o;
 
  // Note the parameters: ra, rd, rs, rg, R, G, B, alpha, r_index, and shinyness)
-
- o=newPlane(.1,.75,.05,.35,.55,.8,.75,1,1.33,2);	// Note the plane is highly-reflective (rs=rg=.75) so we
+ o=newPlane(.1,.75,.05,.8,.55,.8,.75,1,1.33,2);	// Note the plane is highly-reflective (rs=rg=.75) so we
 						// should see some reflections if all is done properly.
 						// Colour is close to cyan, and currently the plane is
 						// completely opaque (alpha=1). The refraction index is
 						// meaningless since alpha=1
- Scale(o,16,10,1);				// Do a few transforms...
+ Scale(o,16,14,1);				// Do a few transforms...
 // Scale(o,20,10,20);				// Do a few transforms...
- RotateZ(o,PI/1.20);
+ RotateZ(o,PI*1.08);
  RotateX(o,PI/2.25);
- Translate(o,0,-3,10);
-// loadTexture(o,"texture/medium_check.ppm");
- loadTexture(o,"texture/lake1.ppm");
+ Translate(o,0,-1,9);
+ loadTexture(o,"texture/medium_check.ppm");
+ //loadTexture(o,"texture/lake1.ppm");
  invert(&o->T[0][0],&o->Tinv[0][0]);		// Very important! compute
 						// and store the inverse
 						// transform for this object!
  insertObject(o,&object_list);			// Insert into object list
 
- //an opague ellipse
- o=newSphere(.05,.95,.35,.35,.5,1,.83,1,1,10);
+//an ellipse
+ o=newSphere(.2,.05,.35,.7,.3,1,.5,.4,1.52,10);
  Scale(o,.75,.5,1.5);
- RotateY(o,PI/3);
- Translate(o,-3,0.1,5);
+ RotateX(o,PI/6);
+ Translate(o,6,0,-4);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
- //a tranparent ellipse
+
+ //an lemonish ellipse
  o=newSphere(.3,.5,.95,1,1,1,.2,1,1.52,10);
- Scale(o,.5,2.0,1.0);
- RotateZ(o,PI/1.8);
- Translate(o,-3.5,-2,1.5);
+ Scale(o,.5,1.8,1.0);
+ RotateZ(o,PI/7.5);
+ Translate(o,4.5,-0.5,-2.5);
  invert(&o->T[0][0],&o->Tinv[0][0]);
  insertObject(o,&object_list);
 
- //a mirror
- o=newPlane(.05,.75,.05,1,1,1,1,1,1,2);
+
+
+ //a mirror (right)
+ o=newPlane(.05,.1,.3,1,1,1,1,1,1,2);
  o->isMirror = 1; 			//for mirror, specify all rgb to 1,1,1
- Scale(o,2.3,2.5,1);
- RotateY(o,PI/3.5);
- RotateZ(o,-PI/19);
- Translate(o,3,-1,3);
+ Scale(o,1.8,10,1);
+ RotateY(o,PI/2);
+ RotateX(o,-PI/2);
+ //RotateZ(o,-PI/12);
+ Translate(o,8,10,3);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+ //another mirror (back center)
+ o=newPlane(.05,.1,.05,1,1,1,1,1,1.5,2);
+ o->isMirror = 1; 			//for mirror, specify all rgb to 1,1,1
+ Scale(o,10,1.8,1);
+// RotateX(o,-PI/4);
+ RotateX(o,-PI/5.5);
+ Translate(o,-3,10,5);
  invert(&o->T[0][0],&o->Tinv[0][0]);	
  insertObject(o,&object_list);		
 
-/* //an transparent plane
- o=newPlane(.05,.1,.7,1,1,1,1,.5,1.5,2);
- Translate(o,-1,1.5,-1);
- invert(&o->T[0][0],&o->Tinv[0][0]);
- insertObject(o,&object_list);
-*/
 
- //an transparent sphere
- o=newSphere(.1,.1,.6,.8,1,1,1,.2,1.42,10);
- Scale(o,1.3,1.3,1.3);
- Translate(o,0,3,1);
- invert(&o->T[0][0],&o->Tinv[0][0]);
- insertObject(o,&object_list);
+ //on more mirror on the top left
+ o=newPlane(.05,.1,.05,1,1,1,1,1,1.5,2);
+ o->isMirror = 1; 			//for mirror, specify all rgb to 1,1,1
+ Scale(o,1.8,5,1);
+ RotateY(o,-PI/2);
+// RotateZ(o,-PI/12);
+ RotateX(o,PI/6);
+ Translate(o,-10,8,2);
+ invert(&o->T[0][0],&o->Tinv[0][0]);	
+ insertObject(o,&object_list);		
 
 
-
- o=newBox(.2,.95,.95,.5,.94,.5,.5,1,1.52,10);
- Scale(o,.5,.5,.5);
- Translate(o,3,3,-1);
- invert(&o->T[0][0],&o->Tinv[0][0]);
- insertObject(o,&object_list);
-
-
-
-
-
-
-
-
-/*
- //an opague cone (crown)
- o=newCone(.2,.8,.1,.8,.8,.8,1,1,1.52,10);
- Scale(o,.5,1.8,.5);
- RotateZ(o,PI/8);
- Translate(o,0,5,-2);
- invert(&o->T[0][0],&o->Tinv[0][0]);
- //insert this object into the boudning box object list
- insertObject(o,&object_list);
-
- //an opague refractive sphere (head)
- o=newSphere(.2,.95,.95,1,.94,.5,.5,1,1.52,10);
- Scale(o,.5,.5,.5);
- Translate(o,3,0,-2);
- invert(&o->T[0][0],&o->Tinv[0][0]);
- insertObject(o,&object_list);
-
-
- //an opague paraboloid (body)
- o=newParaboloid(.2,.5,.1,.3,.8,.8,1,1,1.52,10);
- Scale(o,1.5,2.5,1.5);
+ //the last mirror (bottom left)
+ o=newPlane(.05,.1,.05,1,1,1,1,1,1.5,2);
+ o->isMirror = 1; 			//for mirror, specify all rgb to 1,1,1
+ Scale(o,1.8,3.6,1);
+ RotateY(o,-PI/2);
  RotateZ(o,-PI/12);
- Translate(o,-3,2.5,-2);
- invert(&o->T[0][0],&o->Tinv[0][0]);
- insertObject(o,&object_list);
-
-*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- o=buildAvator();
- //setChildT(o);
-
-/*
- //an opague refractive sphere
- o=newSphere(.3,.95,.95,.5,.94,.5,.5,1,1.52,10);
- Translate(o,-1.9,0,1);
- invert(&o->T[0][0],&o->Tinv[0][0]);
- insertObject(o,&object_list);
-
- //an opaque plane
- o=newPlane(.05,.75,.05,1,.8,.5,.3,1,1,10);
- Scale(o,3.3,2.5,1);
- RotateY(o,-PI/3.5);
- Translate(o,0,0,0);
+ RotateX(o,PI/2);
+ Translate(o,-10,0,0);
  invert(&o->T[0][0],&o->Tinv[0][0]);	
  insertObject(o,&object_list);		
-*/
 
- // Insert a single point light source as sphere
+
+ //transparent plane
+ o=newPlane(.05,.05,.05,.9,1,1,1,.1,3,2);
+ Scale(o,2,1.5,1);
+ RotateX(o,-PI/5.5);
+ Translate(o,5,5,8);
+ invert(&o->T[0][0],&o->Tinv[0][0]);	
+ insertObject(o,&object_list);		
+
+
+
+ //semi-transparent spheres
+ o=newSphere(.1,.1,.6,.9,.3,1,1,.2,1.42,10);
+ Scale(o,1.3,1.3,1.3);
+ Translate(o,-5,4,1);
+ o->isMirror = 1; 			
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+
+ o=newSphere(.1,.1,.4,.8,1,1,1,.2,1.42,10);
+ Scale(o,1.3,1.3,1.3);
+ Translate(o,-2,3,2);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+ //an refractive sphere
+ o=newSphere(.1,.1,.4,1,1,1,1,1,1.42,10);
+ Scale(o,1.3,1.3,1.3);
+ Translate(o,-7.5,0,-1);
+ invert(&o->T[0][0],&o->Tinv[0][0]);
+ insertObject(o,&object_list);
+
+
+
+ buildAvator();
+ buildBuilding();
+
+
+ // Insert a sphere light source as sphere (top sky)
  double r1=3;
- light_radius[0]=r1;
+ light_radius[numLight]=r1;
  o=newSphere(0,0,0,0,.95,.95,.95,1,0,0);
  o->isLightSource=1;
  Scale(o,r1,r1,r1);
- Translate(o,0,14.5,-9.5);
+ Translate(o,2,15,6);
  insertObject(o,&light_list);
+ numLight++;
 
- // End of simple scene for Assignment 3
- // Keep in mind that you can define new types of objects such as cylinders and parametric surfaces,
- // or, you can create code to handle arbitrary triangles and then define objects as surface meshes.
- //
+
+ // Insert a another sphere light source (right floor)
+ r1=.2;
+ light_radius[numLight]=r1;
+ o=newSphere(0,0,0,0,.7,.7,.7,1,0,0);
+ o->isLightSource=1;
+ Scale(o,r1,r1,r1);
+ Translate(o,5,1.5,-1.5);
+ insertObject(o,&light_list);
+ numLight++;
+
+
  // Remember: A lot of the quality of your scene will depend on how much care you have put into defining
  //           the relflectance properties of your objects, and the number and type of light sources
  //           in the scene.
@@ -331,6 +341,7 @@ int main(int argc, char *argv[])
  struct colourRGB background;   // Background colour
  unsigned char *rgbIm;
  srand(1522);
+ numLight=0;
 
  if (argc<5)
  {
@@ -375,8 +386,8 @@ int main(int argc, char *argv[])
 
  // Camera center is at (0,0,-1)
  e.px=0;
- e.py=5;
- e.pz=-10;
+ e.py=7;
+ e.pz=-14;
  e.pw=1;
 
  // To define the gaze vector, we choose a point 'pc' in the scene that
@@ -384,7 +395,7 @@ int main(int argc, char *argv[])
  // Here we set up the camera to be looking at the origin, so g=(0,0,0)-(0,0,-1)
  g.px=0;
  g.py=-2;
- g.pz=10;
+ g.pz=14;
  g.pw=0;
  normalize(&g);
 
@@ -451,7 +462,7 @@ debugUV=fopen("uv.txt","wb+");
 
 
  //openmp multi-threaded
- #pragma omp parallel for
+// #pragma omp parallel for
  for (int j=0;j<sx;j++)		// For each of the pixels in the image
  {
   //direction vector: pixel coordinate-origin
@@ -652,12 +663,14 @@ struct ray3D* gen_refractionRay(struct object3D* obj, struct point3D* n, struct 
     temp.pw = 0;
     normalize(&temp);
     
+    /*
     //recalculate alpha, i.e. tranmittance
     //t is fresnel (transmission) coefficient, TE mode
     double t = 2*ni*cosTheta/(ni*cosTheta+nt*cosPhi);
     obj->alpha = nt*cosPhi*t*t/(ni*cosTheta);
     assert(obj->alpha<1);
     assert(obj->alpha>0);
+    */
 
     return(newRay(p,&temp));
 }
@@ -713,8 +726,6 @@ void rayTrace(struct ray3D *ray, int depth, struct colourRGB *col,
 		struct object3D* top = hitObj;
 		hitObj=NULL;
 		findFirstHit(ray,&lambda,Os,&hitObj,&p,&n,&a,&b,depth,top);
-		if(hitObj)
-		    printf("hit something in the box\n");
 	    }
 
 
@@ -837,6 +848,7 @@ if(dot(n,&ray->d)>=0)
 		rd *=(1-alpha);
 		rs *=(1-alpha);
 		rg *=(1-alpha);
+		alpha=1-alpha;
 	
 		rayTrace(rRay,depth+1,&col_refract,obj);
 	    	free(rRay);
@@ -901,7 +913,6 @@ if(dot(n,&ray->d)>=0)
 
 	for(int light_i=0;light_i<numRays;++light_i){
             //create ray from hitObj to a random point on light source
-	    double lightItensity = 1;
     	    struct point3D shadowRay={0,0,0,1}; //it's still a point for now
 	    double theta = 2*PI*drand48();
 	    double phi = 2*PI*drand48();
@@ -916,25 +927,13 @@ if(dot(n,&ray->d)>=0)
         
 	    //note shadow ray shall not be normalized
             struct ray3D *ray_to_light = newRay(p,&shadowRay);
-            double shadow_t=0, a_temp, b_temp;
-            struct object3D* hitObj=NULL;
-            struct point3D _p,_n;
-            findFirstHit(ray_to_light,&shadow_t,obj,&hitObj,&_p,&_n,&a_temp,&b_temp,depth,NULL);
+	    double lightItensity;
+            lightItensity = findShadowHit(ray_to_light,object_list);
+
             free(ray_to_light);
             ray_to_light=NULL;
            
         
-            //if any opaque object blocks the light,
-            //no diffuse and specular components.
-	    //if the hitObj is transparent,
-	    //a simple model for now, it should be recursively factored by all the alpha
-            if(hitObj != NULL && shadow_t>0 && shadow_t < 1){
-		if(hitObj->alpha<1)
-		    lightItensity *= alpha;
-		else
-		    lightItensity = 0;
-	    }
-
 	    if(lightItensity>0){
 		struct colourRGB col_ds={0,0,0};
                 /* diffuse */
@@ -996,3 +995,36 @@ if(dot(n,&ray->d)>=0)
 }     
 
 
+
+//return accumulated light itensity, if hit any opague object, it's zero
+//list -- object list
+double findShadowHit(struct ray3D *ray, struct object3D* list){
+    int initial=1;
+    double itensity=1; //temporary itensity
+    double temp; //lambda
+    struct point3D _n,_p;//not usful
+
+    struct object3D *cur_obj=list;
+
+    while(cur_obj!=NULL && itensity>0){
+	if(cur_obj->children!=NULL){
+	    //a bounding box
+	    itensity *= findShadowHit(ray,cur_obj->children);
+	    cur_obj=cur_obj->next;
+	}
+
+	cur_obj->intersect(cur_obj,ray,&temp,&_p,&_n,NULL,NULL);
+
+	//Q1:should it compare with 1 instead??
+	if(temp>0 && temp<1){
+    	    if(cur_obj->alpha) //an alpague object
+		return 0;
+	    else{
+		itensity*=(1-cur_obj->alpha);
+	    }
+	}
+
+	cur_obj=cur_obj->next;;
+    }
+    return itensity;
+}
